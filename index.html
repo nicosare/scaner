@@ -34,7 +34,7 @@
             min-height: 100vh;
         }
 
-        /* --- Scanner Area - Центрирование --- */
+        /* Scanner Area - Centered */
         .scanner-wrapper {
             width: 100%;
             padding: 20px 16px;
@@ -44,17 +44,15 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            position: relative;
-            z-index: 10;
-        }
-        .scanner-title {
-            font-size: 14px;
-            color: var(--text-sec);
-            margin-bottom: 12px;
-            font-weight: 500;
         }
 
-        /* Квадратный контейнер для камеры - центрирование */
+        .scanner-title {
+            font-size: 14px;            color: var(--text-sec);
+            margin-bottom: 12px;
+            font-weight: 500;
+            text-align: center;
+        }
+
         #scanner-container {
             width: 100%;
             max-width: 340px;
@@ -71,12 +69,8 @@
         #reader {
             width: 100%;
             height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
-        /* Убираем лишние элементы html5-qrcode */
         #reader video {
             width: 100% !important;
             height: 100% !important;
@@ -88,7 +82,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             color: white;
             padding: 12px 24px;
             border-radius: 24px;
@@ -96,15 +90,13 @@
             font-weight: 600;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.2s;            z-index: 20;
-            text-align: center;
+            transition: opacity 0.2s;
+            z-index: 20;
         }
 
-        /* Кнопка вспышки */
         .torch-btn {
             position: absolute;
-            top: 12px;
-            right: 12px;
+            top: 12px;            right: 12px;
             background: rgba(0,0,0,0.6);
             border: 2px solid rgba(255,255,255,0.3);
             color: white;
@@ -123,14 +115,8 @@
         .torch-btn.active {
             background: rgba(255, 200, 0, 0.9);
             border-color: #fff;
-            box-shadow: 0 0 12px rgba(255, 200, 0, 0.6);
-        }
-        
-        .torch-btn:active {
-            transform: scale(0.95);
         }
 
-        /* --- List Area --- */
         main {
             flex: 1;
             overflow-y: auto;
@@ -145,7 +131,8 @@
             margin-bottom: 16px;
         }
         
-        .count-badge {            background: var(--primary);
+        .count-badge {
+            background: var(--primary);
             color: white;
             padding: 4px 12px;
             border-radius: 16px;
@@ -158,7 +145,6 @@
             padding: 0;
             margin: 0;
         }
-
         .list-item {
             background: var(--surface);
             padding: 14px 16px;
@@ -194,10 +180,9 @@
             text-align: center;
             color: var(--text-sec);
             margin-top: 60px;
-            font-size: 14px;            line-height: 1.6;
+            font-size: 14px;
         }
 
-        /* --- Floating Action Button --- */
         .fab-container {
             position: fixed;
             bottom: 20px;
@@ -209,8 +194,7 @@
             padding: 0 16px;
         }
 
-        .btn-export {
-            border: none;
+        .btn-export {            border: none;
             padding: 18px 32px;
             border-radius: 50px;
             font-size: 16px;
@@ -222,15 +206,8 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            transition: transform 0.1s, box-shadow 0.2s;
-        }
-        
-        .btn-export:active { 
-            transform: scale(0.96);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         }
 
-        /* Toast */
         #toast {
             visibility: hidden;
             min-width: 280px;
@@ -243,48 +220,37 @@
             position: fixed;
             z-index: 150;
             left: 50%;
-            bottom: 100px;            transform: translateX(-50%);
+            bottom: 100px;
+            transform: translateX(-50%);
             font-size: 15px;
-            font-weight: 500;
             box-shadow: 0 8px 24px rgba(0,0,0,0.2);
             opacity: 0;
-            transition: opacity 0.3s, bottom 0.3s;
+            transition: opacity 0.3s;
             word-break: break-all;
         }
 
         #toast.show {
             visibility: visible;
             opacity: 1;
-            bottom: 110px;
         }
         
-        /* Классы для рамки */
         .border-success { 
             border-color: var(--success) !important; 
-            box-shadow: 0 0 20px var(--success), inset 0 0 20px rgba(16, 185, 129, 0.3); 
+            box-shadow: 0 0 20px var(--success); 
         }
         .border-error { 
             border-color: var(--error) !important; 
-            box-shadow: 0 0 20px var(--error), inset 0 0 20px rgba(239, 68, 68, 0.3); 
-        }
-
-        /* Адаптивность */
-        @media (max-width: 380px) {
-            #scanner-container {
-                max-width: 280px;
-            }
+            box-shadow: 0 0 20px var(--error); 
         }
     </style>
-</head>
-<body>
+</head><body>
 
-    <!-- Блок сканера -->
     <div class="scanner-wrapper">
         <div class="scanner-title">Наведите камеру на DataMatrix код</div>
         <div id="scanner-container">
             <div id="reader"></div>
             <button class="torch-btn" id="torch-btn" onclick="toggleTorch()">
-                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                 </svg>
             </button>
@@ -292,21 +258,16 @@
         </div>
     </div>
 
-    <!-- Список -->    <main>
+    <main>
         <div class="list-header">
             <span style="font-size: 16px; color: var(--text); font-weight: 600;">Отсканированные коды</span>
             <div id="total-count" class="count-badge">0</div>
         </div>
         
         <ul id="scanned-list"></ul>
-
-        <div id="empty-msg" class="empty-state">
-            Список пуст<br>
-            <span style="font-size: 12px; opacity: 0.8">Коды добавляются автоматически</span>
-        </div>
+        <div id="empty-msg" class="empty-state">Список пуст<br><span style="font-size: 12px; opacity: 0.8">Коды добавляются автоматически</span></div>
     </main>
 
-    <!-- Кнопка экспорта -->
     <div class="fab-container">
         <button class="btn-export" onclick="exportToExcel()">
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -316,15 +277,14 @@
         </button>
     </div>
 
-    <!-- Всплывающее уведомление -->
     <div id="toast"></div>
 
     <script>
-        // --- Состояние ---
         let scannedCodes = new Set();
         let html5QrcodeScanner = null;
         let isTorchOn = false;
         let lastScanTime = 0;
+        let videoTrack = null;
         
         const container = document.getElementById('scanner-container');
         const torchBtn = document.getElementById('torch-btn');
@@ -333,220 +293,158 @@
         const emptyMsg = document.getElementById('empty-msg');
         const countBadge = document.getElementById('total-count');
         const toast = document.getElementById('toast');
-
-        // --- Запуск сканера при загрузке ---
         window.addEventListener('load', () => {
-            setTimeout(startScanner, 500);
+            setTimeout(initScanner, 300);
         });
 
-        async function startScanner() {
-            try {
-                // Получаем доступ к камере с зумом 2.5x                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { exact: "environment" },
-                        zoom: { ideal: 2.5 },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
-                });
-                
-                // Останавливаем stream, так как html5-qrcode создаст свой
-                stream.getTracks().forEach(track => track.stop());
-                
-            } catch (err) {
-                console.log("Zoom не поддерживается, используем стандартные настройки", err);
-            }
-            
+        async function initScanner() {
             html5QrcodeScanner = new Html5Qrcode("reader");
             
             const config = { 
-                fps: 15, 
+                fps: 10, 
                 qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0,
-                disableFlip: false,
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.DATA_MATRIX,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.AZTEC,
-                    Html5QrcodeSupportedFormats.PDF417
+                    Html5QrcodeSupportedFormats.QR_CODE
                 ]
             };
             
-            // Запускаем с конфигурацией зума
-            const constraints = {
-                video: {
-                    facingMode: { exact: "environment" },
-                    zoom: { ideal: 2.5 },
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            };
-            
-            html5QrcodeScanner.start(
-                { facingMode: "environment" }, 
-                config, 
-                onScanSuccess,
-                onScanFailure
-            )
-            .then(() => {
-                torchBtn.style.display = 'flex';                // Применяем зум после запуска
-                applyZoom(2.5);
-            })
-            .catch(err => {
-                console.error("Ошибка запуска камеры", err);
-                // Пробуем без точных настроек
-                html5QrcodeScanner.start(
+            try {
+                await html5QrcodeScanner.start(
                     { facingMode: "environment" }, 
-                    { fps: 10, qrbox: { width: 250, height: 250 } }, 
+                    config, 
                     onScanSuccess
-                )
-                .then(() => {
-                    torchBtn.style.display = 'flex';
-                })
-                .catch(err2 => {
-                    alert("Ошибка доступа к камере. Убедитесь, что сайт открыт по HTTPS и даны разрешения.");
-                });
-            });
+                );
+                
+                torchBtn.style.display = 'flex';
+                
+                // Применяем зум после запуска камеры
+                setTimeout(applyZoom, 1000);
+                
+            } catch (err) {
+                console.error("Ошибка камеры:", err);
+                alert("Не удалось запустить камеру. Убедитесь, что сайт открыт по HTTPS и даны разрешения.");
+            }
         }
 
-        // Функция применения зума
-        async function applyZoom(zoomLevel) {
-            const videoElement = document.querySelector('#reader video');
-            if (videoElement && videoElement.srcObject) {
-                const track = videoElement.srcObject.getVideoTracks()[0];
-                if (track) {
+        async function applyZoom() {
+            const video = document.querySelector('#reader video');
+            if (video && video.srcObject) {
+                const tracks = video.srcObject.getVideoTracks();
+                if (tracks.length > 0) {
+                    videoTrack = tracks[0];
                     try {
-                        const capabilities = track.getCapabilities();
+                        const capabilities = videoTrack.getCapabilities();
                         if (capabilities.zoom) {
-                            await track.applyConstraints({
-                                advanced: [{ zoom: zoomLevel }]
+                            await videoTrack.applyConstraints({
+                                advanced: [{ zoom: 2.5 }]
                             });
-                            console.log(`Zoom установлен: ${zoomLevel}x`);
+                            console.log("Zoom 2.5x применен");
                         }
-                    } catch (err) {
-                        console.log("Zoom не поддерживается на этом устройстве", err);
+                    } catch (e) {                        console.log("Zoom не поддерживается");
                     }
                 }
             }
         }
 
-        // --- Логика вспышки ---
         async function toggleTorch() {
-            if (!html5QrcodeScanner) return;
+            if (!videoTrack) {
+                const video = document.querySelector('#reader video');
+                if (video && video.srcObject) {
+                    videoTrack = video.srcObject.getVideoTracks()[0];
+                }
+            }
+            
+            if (!videoTrack) {
+                alert("Камера не активна");
+                return;
+            }
 
             try {
                 isTorchOn = !isTorchOn;
-                await html5QrcodeScanner.applyTorch(isTorchOn);
+                const capabilities = videoTrack.getCapabilities();
                 
-                if (isTorchOn) {                    torchBtn.classList.add('active');
-                    // Вибрация при включении
-                    if (navigator.vibrate) navigator.vibrate(50);
+                if (capabilities.torch) {
+                    await videoTrack.applyConstraints({
+                        advanced: [{ torch: isTorchOn }]
+                    });
+                    
+                    if (isTorchOn) {
+                        torchBtn.classList.add('active');
+                        vibrate(50);
+                    } else {
+                        torchBtn.classList.remove('active');
+                    }
                 } else {
-                    torchBtn.classList.remove('active');
+                    isTorchOn = !isTorchOn;
+                    alert("Вспышка не поддерживается");
                 }
             } catch (err) {
-                console.error("Ошибка вспышки", err);
-                isTorchOn = !isTorchOn; 
-                
-                // Пробуем альтернативный метод
-                try {
-                    const videoElement = document.querySelector('#reader video');
-                    if (videoElement && videoElement.srcObject) {
-                        const track = videoElement.srcObject.getVideoTracks()[0];
-                        const capabilities = track.getCapabilities();
-                        
-                        if (capabilities.torch) {
-                            await track.applyConstraints({
-                                advanced: [{ torch: isTorchOn }]
-                            });
-                            if (isTorchOn) {
-                                torchBtn.classList.add('active');
-                                if (navigator.vibrate) navigator.vibrate(50);
-                            } else {
-                                torchBtn.classList.remove('active');
-                            }
-                        } else {
-                            alert("Вспышка не поддерживается на этом устройстве");
-                        }
-                    }
-                } catch (err2) {
-                    alert("Вспышка не поддерживается или уже используется");
-                }
+                console.error("Ошибка вспышки:", err);
+                isTorchOn = !isTorchOn;
+                alert("Не удалось включить вспышку");
             }
         }
 
-        // --- Логика сканирования ---
         function onScanSuccess(decodedText, decodedResult) {
             const now = Date.now();
-            
-            // Защита от повторного сканирования того же кода в течение 1 секунды
             if (now - lastScanTime < 1000) return;
             
-            // Проверка на дубликат
-            if (scannedCodes.has(decodedText)) {
-                flashBorder('error', 'Дубликат');
+            if (scannedCodes.has(decodedText)) {                flashBorder('error', 'Дубликат');
                 return;
             }
+
             lastScanTime = now;
-            
-            // Успешное сканирование
             scannedCodes.add(decodedText);
             addToList(decodedText);
             flashBorder('success', '✓ Добавлено');
             
-            // Вибрация - 3 коротких импульса
-            if (navigator.vibrate) {
-                navigator.vibrate([100, 50, 100]);
-            }
-            
-            // Тост
+            vibrate([100, 50, 100]);
             showToast(decodedText);
         }
 
-        function onScanFailure(error) {
-            // Игнорируем ошибки сканирования (это нормально когда код не найден)
+        function vibrate(pattern) {
+            if (navigator.vibrate) {
+                navigator.vibrate(pattern);
+            }
         }
 
-        // Визуальная обратная связь (рамка)
         function flashBorder(type, text) {
-            // Убираем старые классы
             container.classList.remove('border-success', 'border-error');
-            
-            // Показываем текст
             statusMsg.textContent = text;
             statusMsg.style.opacity = '1';
-
-            // Добавляем нужный класс
+            
             if (type === 'success') {
                 container.classList.add('border-success');
             } else {
                 container.classList.add('border-error');
             }
 
-            // Сброс через 600мс
             setTimeout(() => {
                 container.classList.remove('border-success', 'border-error');
                 statusMsg.style.opacity = '0';
             }, 600);
         }
 
-        // --- Логика списка ---
         function addToList(text) {
             emptyMsg.style.display = 'none';
             countBadge.textContent = scannedCodes.size;
 
             const li = document.createElement('li');
-            li.className = 'list-item';            
+            li.className = 'list-item';
+            
             const now = new Date();
-            const timeString = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
+            const timeString = now.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
             li.innerHTML = `
                 <div style="overflow: hidden; flex: 1;">
                     <div class="item-code">${escapeHtml(text)}</div>
                     <div class="item-time">${timeString}</div>
                 </div>
-                <div style="color: var(--success); flex-shrink: 0; margin-left: 12px; font-weight: bold; font-size: 18px;">✓</div>
+                <div style="color: var(--success); flex-shrink: 0; margin-left: 12px; font-weight: bold;">✓</div>
             `;
             
             listElement.insertBefore(li, listElement.firstChild);
@@ -559,39 +457,32 @@
         }
 
         function showToast(message) {
-            // Обрезаем длинный текст для тоста
             const displayText = message.length > 60 ? message.substring(0, 57) + '...' : message;
-            
             toast.textContent = displayText;
             toast.className = "show";
-            setTimeout(function(){ 
+            setTimeout(() => { 
                 toast.className = toast.className.replace("show", ""); 
             }, 2500);
         }
 
-        // --- Экспорт в Excel (Только коды) ---
         function exportToExcel() {
             if (scannedCodes.size === 0) {
-                alert("Список пуст! Отсканируйте коды перед экспортом.");
+                alert("Список пуст!");
                 return;
             }
 
-            // Создаем массив массивов (AOA) для чистого экспорта без заголовков
             const data = Array.from(scannedCodes).map(code => [code]);
-
             const ws = XLSX.utils.aoa_to_sheet(data);
-            
-            // Устанавливаем ширину колонки
             ws['!cols'] = [{ wch: 60 }];
             
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
+
             const date = new Date().toISOString().slice(0,10).replace(/-/g, '');
             const time = new Date().toTimeString().slice(0,5).replace(/:/g, '');
             XLSX.writeFile(wb, `Скан_${date}_${time}.xlsx`);
             
-            // Вибрация при экспорте
-            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            vibrate([50, 50, 50]);
         }
     </script>
 </body>
