@@ -133,16 +133,30 @@ let lastScan = "";
 let lastTime = 0;
 
 /* ВИБРАЦИЯ (максимально совместимая) */
+let lastVibrationTime = 0;
+
+function safeVibrate(pattern) {
+  const now = Date.now();
+
+  // защита от слишком частых вызовов
+  if (now - lastVibrationTime < 500) return;
+
+  lastVibrationTime = now;
+
+  try {
+    if (navigator.vibrate) {
+      navigator.vibrate(0); // сброс
+      navigator.vibrate(pattern);
+    }
+  } catch (e) {}
+}
+
 function vibrateSuccess() {
-  if (navigator.vibrate) {
-    navigator.vibrate([300, 100, 300]);
-  }
+  safeVibrate([400, 150, 400]);
 }
 
 function vibrateError() {
-  if (navigator.vibrate) {
-    navigator.vibrate([80, 80, 80, 80]);
-  }
+  safeVibrate([120, 80, 120, 80]);
 }
 
 /* ВСПЫШКА */
