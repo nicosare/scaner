@@ -48,7 +48,7 @@
         /* Квадратный контейнер для камеры */
         #scanner-container {
             width: 100%;            max-width: 400px;
-            aspect-ratio: 1 / 1; /* Делает блок квадратным */
+            aspect-ratio: 1 / 1;
             background: #000;
             border-radius: 16px;
             overflow: hidden;
@@ -251,7 +251,7 @@
         </ul>
 
         <div id="empty-msg" class="empty-state">
-            Наведите камеру на код.<br>Сканирование происходит автоматически.
+            Наведите камеру на код DataMatrix.<br>Поддерживаются акцизные марки и Честный Знак.
         </div>
     </main>
 
@@ -290,15 +290,35 @@
             const config = { 
                 fps: 10, 
                 qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+                aspectRatio: 1.0,
+                // Явно указываем поддержку DataMatrix и других форматов
+                formatsToSupport: [                    Html5QrcodeSupportedFormats.DATA_MATRIX,
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.AZTEC,
+                    Html5QrcodeSupportedFormats.PDF417
+                ]
             };
-                        html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
             .then(() => {
-                torchBtn.style.display = 'flex'; // Показать кнопку вспышки, если камера работает
+                torchBtn.style.display = 'flex';
             })
             .catch(err => {
                 console.error("Ошибка запуска камеры", err);
-                alert("Ошибка доступа к камере. Убедитесь, что сайт открыт по HTTPS.");
+                // Пробуем без явного указания форматов (fallback)
+                const fallbackConfig = { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                };
+                
+                html5QrcodeScanner.start({ facingMode: "environment" }, fallbackConfig, onScanSuccess)
+                .then(() => {
+                    torchBtn.style.display = 'flex';
+                })
+                .catch(err2 => {
+                    alert("Ошибка доступа к камере. Убедитесь, что сайт открыт по HTTPS.");
+                });
             });
         }
 
@@ -317,12 +337,10 @@
                 })
                 .catch(err => {
                     console.error("Ошибка вспышки", err);
-                    // Откат состояния если ошибка
                     isTorchOn = !isTorchOn; 
-                    alert("Вспышка не поддерживается этим устройством или браузером.");
+                    alert("Вспышка не поддерживается этим устройством.");
                 });
         }
-
         // --- Логика сканирования ---
         function onScanSuccess(decodedText, decodedResult) {
             // Проверка на дубликат
@@ -342,23 +360,20 @@
             // Тост
             showToast(decodedText);
         }
+
         // Визуальная обратная связь (рамка)
         function flashBorder(type, text) {
-            // Убираем старые классы
             container.classList.remove('border-success', 'border-error');
             
-            // Показываем текст
             statusMsg.textContent = text;
             statusMsg.style.opacity = '1';
 
-            // Добавляем нужный класс
             if (type === 'success') {
                 container.classList.add('border-success');
             } else {
                 container.classList.add('border-error');
             }
 
-            // Сброс через 500мс
             setTimeout(() => {
                 container.classList.remove('border-success', 'border-error');
                 statusMsg.style.opacity = '0';
@@ -375,7 +390,6 @@
             
             const now = new Date();
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
             li.innerHTML = `
                 <div style="overflow: hidden;">
                     <div class="item-code">${text}</div>
@@ -390,7 +404,8 @@
         function showToast(message) {
             toast.textContent = message;
             toast.className = "show";
-            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2000);        }
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2000);
+        }
 
         // --- Экспорт в Excel (Только коды) ---
         function exportToExcel() {
@@ -399,8 +414,6 @@
                 return;
             }
 
-            // Создаем массив массивов (AOA) для чистого экспорта без заголовков
-            // [['Код1'], ['Код2'], ...]
             const data = Array.from(scannedCodes).map(code => [code]);
 
             const ws = XLSX.utils.aoa_to_sheet(data);
