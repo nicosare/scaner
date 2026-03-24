@@ -5,7 +5,6 @@
   <title>Сканер акцизов</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Библиотеки -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
@@ -29,16 +28,6 @@
       border: 2px solid #444;
     }
 
-    #list {
-      margin: 10px;
-      max-height: 40vh;
-      overflow-y: auto;
-      text-align: left;
-      padding: 10px;
-      background: #1e1e1e;
-      border-radius: 10px;
-    }
-
     button {
       margin: 10px;
       padding: 12px 20px;
@@ -47,6 +36,26 @@
       border-radius: 10px;
       background: #4CAF50;
       color: white;
+    }
+
+    /* Контейнер карточек */
+    #list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 10px;
+    }
+
+    /* Карточка */
+    .card {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 12px;
+      word-break: break-all;
+      text-align: left;
+      border: 1px solid #333;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     }
   </style>
 </head>
@@ -70,14 +79,11 @@
 
   async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "environment"
-      }
+      video: { facingMode: "environment" }
     });
 
     video.srcObject = stream;
 
-    // Пытаемся установить zoom x2.5
     const track = stream.getVideoTracks()[0];
     const capabilities = track.getCapabilities();
 
@@ -98,14 +104,15 @@
         if (!scannedSet.has(text)) {
           scannedSet.add(text);
 
-          // Вибрация
           if (navigator.vibrate) {
             navigator.vibrate(100);
           }
 
-          const div = document.createElement('div');
-          div.textContent = text;
-          list.appendChild(div);
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.textContent = text;
+
+          list.appendChild(card);
         }
       }
     });
