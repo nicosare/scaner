@@ -11,13 +11,21 @@
 <style>
 body {
   margin: 0;
-  font-family: sans-serif;
+  font-family: -apple-system, sans-serif;
   background: #0f0f0f;
   color: white;
   text-align: center;
 }
 
-/* Камера меньше */
+h3 {
+  margin: 10px 0;
+}
+
+/* Камера */
+#container {
+  position: relative;
+}
+
 #video {
   width: 75vw;
   height: 75vw;
@@ -26,12 +34,6 @@ body {
   border-radius: 16px;
   object-fit: cover;
   border: 3px solid #444;
-}
-
-/* Контейнер */
-#container {
-  position: relative;
-  margin-top: 10px;
 }
 
 /* Рамка */
@@ -47,7 +49,7 @@ body {
   transition: all 0.2s;
 }
 
-/* Яркая индикация */
+/* Индикация */
 .flash-success {
   border-color: #00ff88 !important;
   box-shadow: 0 0 25px #00ff88;
@@ -60,11 +62,13 @@ body {
   background: rgba(255,0,0,0.15);
 }
 
+/* Счётчик */
 #counter {
   font-size: 20px;
   margin: 8px;
 }
 
+/* Кнопки */
 button {
   margin: 6px;
   padding: 10px 16px;
@@ -75,6 +79,7 @@ button {
   color: white;
 }
 
+/* Список */
 #list {
   padding: 10px;
 }
@@ -103,7 +108,7 @@ button {
 
 <body>
 
-<h3>Сканер акцизов</h3>
+<h3>Сканер акцизных марок</h3>
 
 <div id="container">
   <video id="video" autoplay muted playsinline></video>
@@ -129,35 +134,9 @@ const scannedSet = new Set();
 
 let track;
 let torchOn = false;
+
 let lastScan = "";
 let lastTime = 0;
-
-/* ВИБРАЦИЯ (максимально совместимая) */
-let lastVibrationTime = 0;
-
-function safeVibrate(pattern) {
-  const now = Date.now();
-
-  // защита от слишком частых вызовов
-  if (now - lastVibrationTime < 500) return;
-
-  lastVibrationTime = now;
-
-  try {
-    if (navigator.vibrate) {
-      navigator.vibrate(0); // сброс
-      navigator.vibrate(pattern);
-    }
-  } catch (e) {}
-}
-
-function vibrateSuccess() {
-  safeVibrate([400, 150, 400]);
-}
-
-function vibrateError() {
-  safeVibrate([120, 80, 120, 80]);
-}
 
 /* ВСПЫШКА */
 function flash(type) {
@@ -166,7 +145,7 @@ function flash(type) {
 
   setTimeout(()=>{
     overlay.classList.remove(type);
-  }, 400);
+  }, 350);
 }
 
 function updateCounter() {
@@ -177,6 +156,7 @@ function getTime() {
   return new Date().toLocaleString();
 }
 
+/* КАМЕРА */
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: "environment" }
@@ -222,6 +202,7 @@ async function startScanner() {
     const text = result.text;
     const now = Date.now();
 
+    // анти-дребезг
     if (text === lastScan && now - lastTime < 1200) return;
 
     lastScan = text;
@@ -230,7 +211,11 @@ async function startScanner() {
     if (!scannedSet.has(text)) {
       scannedSet.add(text);
 
-      vibrateSuccess();
+      // ✅ ВИБРАЦИЯ ТОЛЬКО ТУТ
+      if (navigator.vibrate) {
+        navigator.vibrate(200);
+      }
+
       flash('flash-success');
 
       const card = document.createElement('div');
@@ -242,11 +227,9 @@ async function startScanner() {
       `;
 
       list.prepend(card);
-
       updateCounter();
 
     } else {
-      vibrateError();
       flash('flash-error');
     }
   });
@@ -263,6 +246,7 @@ function exportExcel() {
   XLSX.writeFile(wb, "excise_codes.xlsx");
 }
 
+/* СТАРТ */
 startCamera().then(startScanner);
 </script>
 
