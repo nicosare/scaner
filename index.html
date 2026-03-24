@@ -3,559 +3,560 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Сканер Акцизов</title>
-    
-    <script src="https://unpkg.com/@zxing/library@latest" type="text/javascript"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Сканер акцизных марок</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        :root {
-            --primary: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --text: #1e293b;
-            --text-sec: #64748b;
-            --success: #10b981;
-            --error: #ef4444;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
             min-height: 100vh;
-        }
-
-        .scanner-wrapper {
-            width: 100%;
-            padding: 20px 16px;
-            background: var(--surface);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
-            align-items: center;
         }
 
-        .scanner-title {
-            font-size: 14px;
-            color: var(--text-sec);
-            margin-bottom: 12px;
-            font-weight: 500;
+        .header {
             text-align: center;
+            padding: 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
         }
 
-        #scanner-container {
-            width: 100%;
-            max-width: 340px;
-            aspect-ratio: 1 / 1;
-            background: #000;
-            border-radius: 16px;
-            overflow: hidden;
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .header .subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .camera-container {
             position: relative;
-            border: 4px solid transparent;
-            transition: border-color 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+            margin: 16px auto;
+            aspect-ratio: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #333;
         }
 
-        #video {
+        #reader {
             width: 100%;
             height: 100%;
+        }
+
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
             object-fit: cover;
-            display: block;
-            background: #111;
+            transform: scale(2.5);
         }
 
-        .scan-status {
+        .scanner-overlay {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 24px;
-            font-size: 16px;
-            font-weight: 600;
+            width: 70%;
+            height: 70%;
+            border: 2px solid #00ff88;
+            border-radius: 8px;
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            z-index: 20;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
         }
 
-        .torch-btn {
+        .scanner-overlay::before,
+        .scanner-overlay::after {
+            content: '';
             position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(0,0,0,0.6);
-            border: 2px solid rgba(255,255,255,0.3);
-            color: white;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: none;
-            align-items: center;
+            width: 20px;
+            height: 20px;
+            border-color: #00ff88;
+            border-style: solid;
+        }
+
+        .scanner-overlay::before {
+            top: -2px;
+            left: -2px;
+            border-width: 3px 0 0 3px;
+        }
+
+        .scanner-overlay::after {
+            bottom: -2px;
+            right: -2px;
+            border-width: 0 3px 3px 0;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ff88, transparent);
+            animation: scan 2s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        .zoom-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #00ff88;
+        }
+
+        .stats {
+            display: flex;
             justify-content: center;
-            cursor: pointer;
-            backdrop-filter: blur(8px);
-            z-index: 30;
-        }
-        
-        .torch-btn.active {
-            background: rgba(255, 200, 0, 0.9);
-            border-color: #fff;
+            gap: 24px;
+            padding: 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
         }
 
-        .error-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(239, 68, 68, 0.95);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            font-size: 14px;
+        .stat {
             text-align: center;
-            z-index: 40;
-            display: none;
-            max-width: 90%;
         }
 
-        .loading-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 14px;
-            z-index: 40;
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00ff88;
         }
 
-        main {
+        .stat-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .list-container {
             flex: 1;
             overflow-y: auto;
-            padding: 20px 16px;
-            padding-bottom: 100px;
+            padding: 12px;
         }
 
         .list-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
-        
-        .count-badge {
-            background: var(--primary);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 16px;
+
+        .list-title {
             font-size: 14px;
             font-weight: 600;
+            color: #ccc;
         }
 
-        #scanned-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+        .clear-btn {
+            background: #ff4444;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
         }
 
-        .list-item {
-            background: var(--surface);
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        .clear-btn:active {
+            opacity: 0.8;
+        }
+
+        .codes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .code-item {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             animation: slideIn 0.3s ease;
         }
 
-        .item-code {
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            color: var(--text);
-            word-break: break-all;
-            line-height: 1.4;
-        }
-
-        .item-time {
-            font-size: 11px;
-            color: var(--text-sec);
-            margin-top: 6px;
-        }
-
         @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .code-item.new {
+            border-color: #00ff88;
+            background: #0a2a1a;
+        }
+
+        .code-text {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #fff;
+            word-break: break-all;
+            flex: 1;
+            margin-right: 12px;
+        }
+
+        .code-time {
+            font-size: 10px;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: #ff4444;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            margin-left: 8px;
         }
 
         .empty-state {
             text-align: center;
-            color: var(--text-sec);
-            margin-top: 60px;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state-text {
             font-size: 14px;
         }
 
-        .fab-container {
+        .export-btn {
             position: fixed;
             bottom: 20px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: center;
-            z-index: 20;
-            padding: 0 16px;
-        }
-
-        .btn-export {
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #00cc6a, #00ff88);
+            color: #000;
             border: none;
-            padding: 18px 32px;
-            border-radius: 50px;
+            padding: 16px 32px;
+            border-radius: 28px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            background-color: var(--surface);
-            color: var(--text);
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            z-index: 100;
         }
 
-        #toast {
-            visibility: hidden;
-            min-width: 280px;
-            max-width: 90%;
-            background-color: var(--success);
-            color: #fff;
-            text-align: center;
-            border-radius: 12px;
-            padding: 16px 20px;
+        .export-btn:active {
+            transform: translateX(-50%) scale(0.98);
+        }
+
+        .export-btn:disabled {
+            background: #333;
+            color: #666;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .toast {
             position: fixed;
-            z-index: 150;
+            top: 50%;
             left: 50%;
-            bottom: 100px;
-            transform: translateX(-50%);
-            font-size: 15px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff88;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 1000;
             opacity: 0;
+            pointer-events: none;
             transition: opacity 0.3s;
-            word-break: break-all;
+            border: 1px solid #00ff88;
         }
 
-        #toast.show {
-            visibility: visible;
+        .toast.show {
             opacity: 1;
         }
-        
-        .border-success { 
-            border-color: var(--success) !important; 
-            box-shadow: 0 0 20px var(--success); 
+
+        .start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #0a0a0a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
-        .border-error { 
-            border-color: var(--error) !important; 
-            box-shadow: 0 0 20px var(--error); 
+
+        .start-btn {
+            background: linear-gradient(135deg, #00cc6a, #00ff88);
+            color: #000;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 32px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 24px;
+        }
+
+        .start-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .start-text {
+            text-align: center;
+            color: #888;
+            padding: 0 40px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
+    <div class="start-screen" id="startScreen">
+        <div class="start-icon">📷</div>
+        <div class="start-text">
+            Наведите камеру на DataMatrix код акцизной марки или маркировки «Честный ЗНАК»
+        </div>
+        <button class="start-btn" onclick="startScanner()">Начать сканирование</button>
+    </div>
 
-    <div class="scanner-wrapper">
-        <div class="scanner-title">Наведите камеру на код</div>
-        <div id="scanner-container">
-            <video id="video" playsinline autoplay muted></video>
-            <div id="loading-msg" class="loading-message">Запуск камеры...</div>
-            <div id="error-msg" class="error-message"></div>
-            <button class="torch-btn" id="torch-btn" onclick="toggleTorch()">
-                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
-                </svg>
-            </button>
-            <div id="scan-status-msg" class="scan-status"></div>
+    <div class="header">
+        <h1>Сканер акцизных марок</h1>
+        <div class="subtitle">DataMatrix (ECC 200) • Честный ЗНАК</div>
+    </div>
+
+    <div class="camera-container">
+        <div id="reader"></div>
+        <div class="scanner-overlay">
+            <div class="scan-line"></div>
+        </div>
+        <div class="zoom-indicator">2.5×</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value" id="count">0</div>
+            <div class="stat-label">Отсканировано</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="unique">0</div>
+            <div class="stat-label">Уникальных</div>
         </div>
     </div>
 
-    <main>
+    <div class="list-container">
         <div class="list-header">
-            <span style="font-size: 16px; color: var(--text); font-weight: 600;">Отсканированные коды</span>
-            <div id="total-count" class="count-badge">0</div>
+            <span class="list-title">Список кодов</span>
+            <button class="clear-btn" onclick="clearAll()">Очистить</button>
         </div>
-        
-        <ul id="scanned-list"></ul>
-        <div id="empty-msg" class="empty-state">Список пуст<br><span style="font-size: 12px; opacity: 0.8">Коды добавляются автоматически</span></div>
-    </main>
-
-    <div class="fab-container">
-        <button class="btn-export" onclick="exportToExcel()">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
-            </svg>
-            Скачать Excel
-        </button>
+        <div class="codes-list" id="codesList">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">Нет отсканированных кодов</div>
+            </div>
+        </div>
     </div>
 
-    <div id="toast"></div>
+    <button class="export-btn" id="exportBtn" onclick="exportToExcel()" disabled>
+        📥 Экспорт в Excel
+    </button>
+
+    <div class="toast" id="toast"></div>
 
     <script>
-        let scannedCodes = new Set();
-        let lastScanTime = 0;
-        let videoTrack = null;
-        let isTorchOn = false;
-        let codeReader = null;
-        let isScanning = false;
-        
-        const video = document.getElementById('video');
-        const container = document.getElementById('scanner-container');
-        const torchBtn = document.getElementById('torch-btn');
-        const statusMsg = document.getElementById('scan-status-msg');
-        const listElement = document.getElementById('scanned-list');
-        const emptyMsg = document.getElementById('empty-msg');
-        const countBadge = document.getElementById('total-count');
-        const toast = document.getElementById('toast');
-        const loadingMsg = document.getElementById('loading-msg');
-        const errorMsg = document.getElementById('error-msg');
+        let html5QrCode;
+        let scannedCodes = [];
+        let uniqueCodes = new Set();
 
-        window.addEventListener('load', () => {
-            setTimeout(initScanner, 100);
-        });
-
-        async function initScanner() {
-            try {
-                loadingMsg.style.display = 'block';
-                errorMsg.style.display = 'none';
-
-                // Проверяем HTTPS
-                if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-                    throw new Error('Камера работает только по HTTPS');
-                }
-
-                // Проверяем поддержку камеры
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error('Камера не поддерживается браузером');
-                }
-
-                // Запрашиваем камеру
-                const constraints = {
-                    video: {
-                        facingMode: { exact: "environment" },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
-                };
-
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                // Проверяем stream
-                if (!stream || !stream.getVideoTracks().length) {
-                    throw new Error('Не удалось получить видеопоток');
-                }
-
-                videoTrack = stream.getVideoTracks()[0];
-                video.srcObject = stream;
-                
-                // Ждем загрузки видео
-                await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error('Таймаут загрузки камеры'));
-                    }, 10000);
-
-                    video.onloadedmetadata = () => {
-                        clearTimeout(timeout);
-                        video.play().then(() => {
-                            resolve();
-                        }).catch(err => {
-                            reject(new Error('Ошибка воспроизведения: ' + err.message));
-                        });
-                    };
-
-                    video.onerror = () => {
-                        clearTimeout(timeout);
-                        reject(new Error('Ошибка видео элемента'));
-                    };
-                });
-
-                // Скрываем загрузку, показываем камеру
-                loadingMsg.style.display = 'none';
-                torchBtn.style.display = 'flex';
-                
-                // Применяем зум
-                setTimeout(applyZoom, 1000);
-                
-                // Инициализируем сканер
-                initZXing();
-                
-            } catch (err) {
-                console.error("Ошибка инициализации:", err);
-                loadingMsg.style.display = 'none';
-                errorMsg.style.display = 'block';
-                errorMsg.textContent = 'Ошибка камеры: ' + err.message + '\n\nУбедитесь:\n• Сайт открыт по HTTPS\n• Даны разрешения на камеру\n• Камера не используется другими приложениями';
-            }
+        function startScanner() {
+            document.getElementById('startScreen').classList.add('hidden');
+            initScanner();
         }
 
-        function initZXing() {
-            try {
-                codeReader = new ZXing.BrowserMultiFormatReader(
-                    { 
-                        hints: new Map([
-                            [ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                                ZXing.BarcodeFormat.DATA_MATRIX,
-                                ZXing.BarcodeFormat.QR_CODE,
-                                ZXing.BarcodeFormat.AZTEC,
-                                ZXing.BarcodeFormat.PDF_417
-                            ]],
-                            [ZXing.DecodeHintType.TRY_HARDER, true],
-                            [ZXing.DecodeHintType.CHARACTER_SET, 'UTF-8']
-                        ])
-                    },
-                    null
-                );
-                
-                // Запускаем непрерывное сканирование
-                startContinuousScan();
-                
-            } catch (err) {
-                console.error("Ошибка ZXing:", err);
-            }
-        }
-
-        async function applyZoom() {
-            if (!videoTrack) return;
-            try {
-                const capabilities = videoTrack.getCapabilities();
-                if (capabilities.zoom) {
-                    await videoTrack.applyConstraints({
-                        advanced: [{ zoom: 2.5 }]
-                    });
-                }
-            } catch (e) {
-                console.log("Zoom не поддерживается");
-            }
-        }
-
-        async function toggleTorch() {
-            if (!videoTrack) {
-                alert("Камера не активна");
-                return;
-            }
-            try {
-                isTorchOn = !isTorchOn;
-                const capabilities = videoTrack.getCapabilities();
-                if (capabilities.torch) {
-                    await videoTrack.applyConstraints({
-                        advanced: [{ torch: isTorchOn }]
-                    });
-                    torchBtn.classList.toggle('active', isTorchOn);
-                    if (isTorchOn) vibrate(50);
-                } else {
-                    isTorchOn = !isTorchOn;
-                    alert("Вспышка не поддерживается");
-                }
-            } catch (err) {
-                isTorchOn = !isTorchOn;
-                alert("Ошибка вспышки: " + err.message);
-            }
-        }
-
-        function startContinuousScan() {
-            function scan() {
-                if (!isScanning && video.readyState === video.HAVE_ENOUGH_DATA && codeReader) {
-                    isScanning = true;
-                    
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = 640;
-                    canvas.height = 640;
-                    
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    codeReader.decodeFromCanvas(canvas, (result, err) => {
-                        if (result && result.text) {
-                            handleScanResult(result.text);
-                        }
-                        isScanning = false;
-                    });
-                }
-                
-                requestAnimationFrame(scan);
-            }
+        function initScanner() {
+            html5QrCode = new Html5Qrcode("reader");
             
-            scan();
+            const config = {
+                fps: 10,
+                qrbox: { width: 200, height: 200 },
+                aspectRatio: 1.0,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.DATA_MATRIX
+                ]
+            };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                showToast('Ошибка доступа к камере: ' + err);
+            });
         }
 
-        function handleScanResult(text) {
-            const now = Date.now();
-            if (now - lastScanTime < 1000) return;
-            
-            if (scannedCodes.has(text)) {
-                flashBorder('error', 'Дубликат');
-                return;
+        function onScanSuccess(decodedText, decodedResult) {
+            // Проверяем, не сканировали ли уже этот код
+            if (uniqueCodes.has(decodedText)) {
+                return; // Игнорируем дубликаты
             }
 
-            lastScanTime = now;
-            scannedCodes.add(text);
-            addToList(text);
-            flashBorder('success', '✓ Добавлено');
-            
-            vibrate([100, 50, 100]);
-            showToast(text);
-        }
-
-        function vibrate(pattern) {
+            // Вибрация
             if (navigator.vibrate) {
-                navigator.vibrate(pattern);
+                navigator.vibrate(200);
+            }
+
+            // Добавляем код
+            uniqueCodes.add(decodedText);
+            const codeData = {
+                code: decodedText,
+                timestamp: new Date(),
+                id: Date.now()
+            };
+            scannedCodes.unshift(codeData);
+
+            // Обновляем UI
+            updateUI();
+            showToast('Код отсканирован!');
+        }
+
+        function onScanFailure(error) {
+            // Игнорируем ошибки сканирования (когда код не найден)
+        }
+
+        function updateUI() {
+            // Обновляем счетчики
+            document.getElementById('count').textContent = scannedCodes.length;
+            document.getElementById('unique').textContent = uniqueCodes.size;
+
+            // Обновляем список
+            const listContainer = document.getElementById('codesList');
+            
+            if (scannedCodes.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-text">Нет отсканированных кодов</div>
+                    </div>
+                `;
+                document.getElementById('exportBtn').disabled = true;
+                return;
+            }
+
+            document.getElementById('exportBtn').disabled = false;
+
+            listContainer.innerHTML = scannedCodes.map((item, index) => `
+                <div class="code-item ${index === 0 ? 'new' : ''}">
+                    <div>
+                        <div class="code-text">${escapeHtml(item.code)}</div>
+                        <div class="code-time">${formatTime(item.timestamp)}</div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteCode(${item.id})">×</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteCode(id) {
+            const index = scannedCodes.findIndex(item => item.id === id);
+            if (index > -1) {
+                uniqueCodes.delete(scannedCodes[index].code);
+                scannedCodes.splice(index, 1);
+                updateUI();
             }
         }
 
-        function flashBorder(type, text) {
-            container.classList.remove('border-success', 'border-error');
-            statusMsg.textContent = text;
-            statusMsg.style.opacity = '1';
+        function clearAll() {
+            if (scannedCodes.length === 0) return;
             
-            if (type === 'success') {
-                container.classList.add('border-success');
-            } else {
-                container.classList.add('border-error');
+            if (confirm('Очистить все отсканированные коды?')) {
+                scannedCodes = [];
+                uniqueCodes.clear();
+                updateUI();
             }
-
-            setTimeout(() => {
-                container.classList.remove('border-success', 'border-error');
-                statusMsg.style.opacity = '0';
-            }, 600);
         }
 
-        function addToList(text) {
-            emptyMsg.style.display = 'none';
-            countBadge.textContent = scannedCodes.size;
+        function exportToExcel() {
+            if (scannedCodes.length === 0) return;
 
-            const li = document.createElement('li');
-            li.className = 'list-item';
-            
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('ru-RU', { 
+            // Создаем данные для Excel
+            const data = scannedCodes.map((item, index) => ({
+                '№': index + 1,
+                'Код маркировки': item.code,
+                'Дата': item.timestamp.toLocaleDateString('ru-RU'),
+                'Время': item.timestamp.toLocaleTimeString('ru-RU')
+            }));
+
+            // Создаем workbook
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Акцизные марки');
+
+            // Автоматическая ширина колонок
+            const colWidths = [
+                { wch: 5 },   // №
+                { wch: 60 },  // Код
+                { wch: 12 },  // Дата
+                { wch: 10 }   // Время
+            ];
+            ws['!cols'] = colWidths;
+
+            // Скачиваем файл
+            const fileName = `Акцизы_${new Date().toLocaleDateString('ru-RU')}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+
+            showToast('Файл сохранен!');
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('ru-RU', { 
                 hour: '2-digit', 
                 minute: '2-digit', 
                 second: '2-digit' 
             });
-
-            li.innerHTML = `
-                <div style="overflow: hidden; flex: 1;">
-                    <div class="item-code">${escapeHtml(text)}</div>
-                    <div class="item-time">${timeString}</div>
-                </div>
-                <div style="color: var(--success); flex-shrink: 0; margin-left: 12px; font-weight: bold;">✓</div>
-            `;
-            
-            listElement.insertBefore(li, listElement.firstChild);
         }
 
         function escapeHtml(text) {
@@ -565,33 +566,20 @@
         }
 
         function showToast(message) {
-            const displayText = message.length > 60 ? message.substring(0, 57) + '...' : message;
-            toast.textContent = displayText;
-            toast.className = "show";
-            setTimeout(() => { 
-                toast.className = toast.className.replace("show", ""); 
-            }, 2500);
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 1500);
         }
 
-        function exportToExcel() {
-            if (scannedCodes.size === 0) {
-                alert("Список пуст!");
-                return;
+        // Останавливаем сканер при закрытии страницы
+        window.addEventListener('beforeunload', () => {
+            if (html5QrCode) {
+                html5QrCode.stop();
             }
-
-            const data = Array.from(scannedCodes).map(code => [code]);
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            ws['!cols'] = [{ wch: 60 }];
-            
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
-
-            const date = new Date().toISOString().slice(0,10).replace(/-/g, '');
-            const time = new Date().toTimeString().slice(0,5).replace(/:/g, '');
-            XLSX.writeFile(wb, `Скан_${date}_${time}.xlsx`);
-            
-            vibrate([50, 50, 50]);
-        }
+        });
     </script>
 </body>
 </html>
