@@ -38,7 +38,6 @@
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
-            letter-spacing: -0.3px;
         }
 
         .header p {
@@ -50,7 +49,7 @@
         .camera-panel {
             background: white;
             border-radius: 28px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
             margin-bottom: 24px;
             overflow: hidden;
         }
@@ -73,7 +72,6 @@
             height: 100%;
             object-fit: cover;
             border-radius: 24px;
-            transform: scaleX(1);
         }
 
         #canvasOverlay {
@@ -137,11 +135,6 @@
         .btn-export {
             background: #0f3b2c;
             color: white;
-            box-shadow: 0 2px 8px rgba(15, 59, 44, 0.2);
-        }
-
-        .btn-export:active {
-            background: #0a2c21;
         }
 
         .list-section {
@@ -163,7 +156,6 @@
         .list-header h2 {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #0f2b3d;
         }
 
         .badge {
@@ -188,22 +180,15 @@
             justify-content: space-between;
             padding: 14px 20px;
             border-bottom: 1px solid #f0f2f8;
-            transition: background 0.15s;
             gap: 12px;
         }
 
-        .scan-item:active {
-            background: #f8fafc;
-        }
-
         .code-text {
-            font-family: 'SF Mono', 'Menlo', monospace;
+            font-family: monospace;
             font-size: 0.85rem;
             font-weight: 500;
-            color: #0f172a;
             word-break: break-all;
             flex: 1;
-            letter-spacing: 0.2px;
         }
 
         .delete-btn {
@@ -214,8 +199,6 @@
             color: #94a3b8;
             padding: 6px;
             border-radius: 40px;
-            transition: 0.1s;
-            line-height: 1;
         }
 
         .delete-btn:active {
@@ -240,24 +223,18 @@
             padding: 10px 20px;
             border-radius: 60px;
             font-size: 0.85rem;
-            font-weight: 500;
             opacity: 0;
             transition: opacity 0.2s;
             pointer-events: none;
             z-index: 1000;
-            white-space: normal;
-            text-align: center;
             backdrop-filter: blur(8px);
             background: rgba(0,0,0,0.8);
             max-width: 90vw;
+            text-align: center;
         }
 
         .toast-msg.show {
             opacity: 1;
-        }
-
-        .hidden {
-            display: none !important;
         }
 
         button:disabled {
@@ -281,6 +258,7 @@
         <div class="camera-controls">
             <button id="startCameraBtn" class="btn btn-primary">📷 Запустить камеру</button>
             <button id="stopCameraBtn" class="btn btn-outline" disabled>⏹️ Остановить</button>
+            <button id="switchCameraBtn" class="btn btn-outline" disabled>🔄 Сменить камеру</button>
         </div>
     </div>
 
@@ -300,12 +278,13 @@
 <div id="toastMessage" class="toast-msg"></div>
 
 <script>
-    // DOM элементы
+    // DOM
     const video = document.getElementById('videoElement');
     const overlayCanvas = document.getElementById('canvasOverlay');
     const ctx = overlayCanvas.getContext('2d');
     const startBtn = document.getElementById('startCameraBtn');
     const stopBtn = document.getElementById('stopCameraBtn');
+    const switchBtn = document.getElementById('switchCameraBtn');
     const scansListEl = document.getElementById('scansList');
     const countBadge = document.getElementById('countBadge');
     const exportBtn = document.getElementById('exportExcelBtn');
@@ -315,7 +294,9 @@
     let scannedCodes = [];
     let currentReader = null;
     let currentStream = null;
-    let isScanningActive = false;
+    let isScanning = false;
+    let currentCameraIndex = 0;          // 0 - задняя, 1 - фронтальная (если есть)
+    let availableCameras = [];            // список устройств видео
     let frameTimer = null;
 
     // Утилиты
@@ -328,15 +309,11 @@
     function updateList() {
         scansListEl.innerHTML = '';
         if (scannedCodes.length === 0) {
-            const emptyLi = document.createElement('li');
-            emptyLi.className = 'empty-state';
-            emptyLi.innerText = '📭 Нет отсканированных кодов. Наведите камеру на марку.';
-            scansListEl.appendChild(emptyLi);
+            scansListEl.innerHTML = '<li class="empty-state">📭 Нет отсканированных кодов. Наведите камеру на марку.</li>';
             countBadge.innerText = '0';
             return;
         }
         countBadge.innerText = scannedCodes.length;
-        // Новые сверху
         [...scannedCodes].reverse().forEach((item) => {
             const li = document.createElement('li');
             li.className = 'scan-item';
@@ -346,8 +323,7 @@
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
             delBtn.className = 'delete-btn';
-            delBtn.onclick = (e) => {
-                e.stopPropagation();
+            delBtn.onclick = () => {
                 const idx = scannedCodes.findIndex(c => c.text === item.text && c.timestamp === item.timestamp);
                 if (idx !== -1) {
                     scannedCodes.splice(idx, 1);
@@ -367,12 +343,13 @@
         if (scannedCodes.some(c => c.text === normalized)) return false;
         scannedCodes.unshift({ text: normalized, timestamp: Date.now() });
         updateList();
-        showToast(`✅ ${normalized.length > 28 ? normalized.slice(0, 26) + '…' : normalized}`);
-        if (window.navigator && window.navigator.vibrate) navigator.vibrate(80);
+        const short = normalized.length > 28 ? normalized.slice(0, 26) + '…' : normalized;
+        showToast(`✅ ${short}`);
+        if (navigator.vibrate) navigator.vibrate(80);
         return true;
     }
 
-    // Рисование рамки
+    // Рисование зелёной рамки
     function drawBox(points) {
         if (!ctx || !overlayCanvas) return;
         const rect = overlayCanvas.parentElement.getBoundingClientRect();
@@ -381,20 +358,18 @@
         ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         if (!points || points.length < 3) return;
 
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
-        if (videoWidth === 0 || videoHeight === 0) return;
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (vw === 0 || vh === 0) return;
 
-        const scaleX = overlayCanvas.width / videoWidth;
-        const scaleY = overlayCanvas.height / videoHeight;
-
+        const sx = overlayCanvas.width / vw;
+        const sy = overlayCanvas.height / vh;
         ctx.beginPath();
         ctx.strokeStyle = '#22c55e';
         ctx.lineWidth = 4;
-        const first = points[0];
-        ctx.moveTo(first.x * scaleX, first.y * scaleY);
+        ctx.moveTo(points[0].x * sx, points[0].y * sy);
         for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
+            ctx.lineTo(points[i].x * sx, points[i].y * sy);
         }
         ctx.closePath();
         ctx.stroke();
@@ -410,19 +385,31 @@
     }
 
     function clearOverlay() {
-        if (ctx && overlayCanvas) ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        if (ctx) ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         if (frameTimer) clearTimeout(frameTimer);
+    }
+
+    // Получение списка камер и выбор задней по умолчанию
+    async function getCameraDevices() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        availableCameras = videoDevices;
+        if (videoDevices.length === 0) throw new Error('Нет доступных камер');
+        // Находим заднюю камеру (environment)
+        const backIndex = videoDevices.findIndex(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('environment')
+        );
+        if (backIndex !== -1) currentCameraIndex = backIndex;
+        else currentCameraIndex = 0; // первая доступная
+        return videoDevices;
     }
 
     // Остановка всего
     async function stopCamera() {
-        if (!isScanningActive && !currentStream && !currentReader) return;
-        isScanningActive = false;
-
+        isScanning = false;
         if (currentReader) {
-            try {
-                await currentReader.reset();
-            } catch(e) { console.warn(e); }
+            try { await currentReader.reset(); } catch(e) {}
             currentReader = null;
         }
         if (currentStream) {
@@ -434,94 +421,119 @@
         clearOverlay();
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        switchBtn.disabled = true;
         showToast('Камера остановлена');
     }
 
-    // Запуск
+    // Запуск камеры с указанным устройством
+    async function startWithDevice(deviceId) {
+        if (currentStream) {
+            // останавливаем предыдущий поток перед новым запросом
+            currentStream.getTracks().forEach(t => t.stop());
+            currentStream = null;
+        }
+        const constraints = { video: { deviceId: { exact: deviceId }, facingMode: { exact: 'environment' } } };
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
+        currentStream = stream;
+        video.srcObject = stream;
+        await video.play();
+        await new Promise(resolve => {
+            if (video.videoWidth > 0) resolve();
+            else video.onloadedmetadata = resolve;
+        });
+        // Настройка canvas
+        const rect = overlayCanvas.parentElement.getBoundingClientRect();
+        overlayCanvas.width = rect.width;
+        overlayCanvas.height = rect.height;
+        clearOverlay();
+
+        // Инициализация сканера
+        const { BrowserMultiFormatReader } = ZXing;
+        const reader = new BrowserMultiFormatReader();
+        currentReader = reader;
+        isScanning = true;
+
+        reader.decodeFromVideoElement(video, (result, err) => {
+            if (!isScanning) return;
+            if (result) {
+                const text = result.getText();
+                const points = result.getResultPoints();
+                if (points && points.length) drawBox(points);
+                addCode(text);
+            }
+            // Ошибки "код не найден" игнорируем
+            if (err && err.name !== 'NotFoundException' && err.name !== 'ChecksumException') {
+                console.warn(err);
+            }
+        }).catch(e => {
+            console.error('ZXing error', e);
+            if (isScanning) showToast('Ошибка сканера, перезапустите', 2000);
+        });
+    }
+
+    // Основной запуск камеры (выбор первой/задней)
     async function startCamera() {
-        if (isScanningActive) {
+        if (isScanning) {
             showToast('Камера уже работает');
             return;
         }
-
         try {
-            // 1. Запрашиваем доступ
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            currentStream = stream;
-            video.srcObject = stream;
-            await video.play();
-
-            // Ждём метаданных
-            await new Promise((resolve) => {
-                if (video.videoWidth > 0) resolve();
-                else video.onloadedmetadata = () => resolve();
-            });
-
-            // 2. Инициализируем сканер
-            const { BrowserMultiFormatReader } = ZXing;
-            const reader = new BrowserMultiFormatReader();
-            currentReader = reader;
-
-            // Устанавливаем флаг, что сканирование активно
-            isScanningActive = true;
-
-            // Запускаем непрерывное сканирование без await (чтобы не блокировать)
-            reader.decodeFromVideoElement(video, (result, err) => {
-                if (!isScanningActive) return;
-                if (result) {
-                    const text = result.getText();
-                    // Рамка
-                    const points = result.getResultPoints();
-                    if (points && points.length) drawBox(points);
-                    addCode(text);
-                }
-                // Игнорируем ошибки "не найден код"
-                if (err && err.name !== 'NotFoundException' && err.name !== 'ChecksumException') {
-                    console.warn('ZXing error:', err);
-                }
-            }).catch(e => {
-                console.error('ZXing decode error:', e);
-                if (isScanningActive) {
-                    showToast('Ошибка сканера. Перезапустите камеру.', 2500);
-                    stopCamera();
-                }
-            });
-
+            // Сначала запрашиваем разрешение через временный поток, чтобы получить лейблы
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            if (devices.filter(d => d.kind === 'videoinput').length === 0) {
+                // если нет устройств, запрашиваем разрешение, чтобы они появились
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(t => t.stop());
+                devices = await navigator.mediaDevices.enumerateDevices();
+            }
+            await getCameraDevices(); // заполняет availableCameras и currentCameraIndex
+            if (availableCameras.length === 0) throw new Error('Камера не найдена');
+            const deviceId = availableCameras[currentCameraIndex].deviceId;
+            await startWithDevice(deviceId);
             startBtn.disabled = true;
             stopBtn.disabled = false;
-            showToast('Камера готова. Наведите на акцизную марку.', 2000);
-            clearOverlay();
-
+            switchBtn.disabled = availableCameras.length < 2; // только если есть больше одной камеры
+            showToast('Камера запущена. Наведите на марку.', 2000);
         } catch (error) {
-            console.error('Camera start error:', error);
+            console.error(error);
             let msg = 'Не удалось получить доступ к камере. ';
-            if (error.name === 'NotAllowedError') msg += 'Разрешение отклонено. Проверьте настройки сайта.';
+            if (error.name === 'NotAllowedError') msg += 'Разрешение отклонено. Нажмите разрешить в браузере.';
             else if (error.name === 'NotFoundError') msg += 'Камера не найдена.';
-            else if (error.name === 'NotReadableError') msg += 'Камера занята другим приложением.';
-            else msg += 'Убедитесь, что сайт открыт по HTTPS и разрешён доступ.';
-            showToast(msg, 4000);
+            else if (error.name === 'NotReadableError') msg += 'Камера занята.';
+            else msg += 'Проверьте, что сайт открыт по HTTPS и разрешён доступ.';
+            showToast(msg, 5000);
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            if (currentStream) {
-                currentStream.getTracks().forEach(t => t.stop());
-                currentStream = null;
-            }
-            isScanningActive = false;
+            switchBtn.disabled = true;
         }
     }
 
-    // Экспорт в Excel (простой текстовый файл .xls)
+    // Переключение камеры
+    async function switchCamera() {
+        if (!isScanning || availableCameras.length < 2) return;
+        // переключить индекс
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+        const newDeviceId = availableCameras[currentCameraIndex].deviceId;
+        try {
+            await startWithDevice(newDeviceId);
+            showToast('Камера переключена', 1000);
+        } catch (e) {
+            showToast('Не удалось переключить камеру', 2000);
+        }
+    }
+
+    // Экспорт в Excel
     function exportExcel() {
         if (scannedCodes.length === 0) {
-            showToast('Нет данных для экспорта', 1500);
+            showToast('Нет данных для экспорта');
             return;
         }
-        let content = scannedCodes.map(item => item.text).join('\n');
+        const content = scannedCodes.map(item => item.text).join('\n');
         const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         const date = new Date();
-        const filename = `акцизы_${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}.xls`;
+        const filename = `акцизы_${date.toISOString().slice(0,19).replace(/:/g, '-')}.xls`;
         link.href = url;
         link.download = filename;
         document.body.appendChild(link);
@@ -534,11 +546,12 @@
     // События
     startBtn.addEventListener('click', startCamera);
     stopBtn.addEventListener('click', stopCamera);
+    switchBtn.addEventListener('click', switchCamera);
     exportBtn.addEventListener('click', exportExcel);
 
-    // Адаптация canvas при изменении размера
+    // При загрузке страницы проверяем поддержку, но не запрашиваем камеру автоматически
     window.addEventListener('resize', () => {
-        if (isScanningActive && overlayCanvas) {
+        if (isScanning && overlayCanvas) {
             const rect = overlayCanvas.parentElement.getBoundingClientRect();
             overlayCanvas.width = rect.width;
             overlayCanvas.height = rect.height;
