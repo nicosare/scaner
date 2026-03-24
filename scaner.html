@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Сканер акцизных марок и Честного знака</title>
+    <!-- Подключение ZXing для распознавания штрихкодов (Data Matrix, QR, EAN и др.) -->
+    <script src="https://unpkg.com/@zxing/library@0.19.0/umd/index.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1e293b;
+            padding: 20px 16px 32px;
+            min-height: 100vh;
+        }
+
+        /* Контейнер для всего приложения */
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Заголовок */
+        .header {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #0f2b3d, #1b4a6e);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .header p {
+            font-size: 0.85rem;
+            color: #5b6e8c;
+            margin-top: 6px;
+        }
+
+        /* Панель управления камерой */
+        .camera-panel {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            margin-bottom: 24px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            width: 100%;
+            border-radius: 24px;
+            overflow: hidden;
+            aspect-ratio: 4 / 3;
+            background-color: #111;
+        }
+
+        #videoElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 24px;
+            transform: scaleX(1);
+        }
+
+        #canvasOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+            border-radius: 24px;
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 12px;
+            padding: 16px;
+            background: white;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            border: none;
+            background: #eef2ff;
+            padding: 12px 20px;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #1e40af;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(4px);
+            flex: 1 0 auto;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: #1e40af;
+            color: white;
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
+        }
+
+        .btn-primary:active {
+            background: #1e3a8a;
+            transform: scale(0.97);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+        }
+
+        .btn-outline:active {
+            background: #f1f5f9;
+        }
+
+        .btn-export {
+            background: #0f3b2c;
+            color: white;
+            box-shadow: 0 2px 8px rgba(15, 59, 44, 0.2);
+        }
+
+        .btn-export:active {
+            background: #0a2c21;
+        }
+
+        /* Список отсканированных кодов */
+        .list-section {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            padding: 8px 0;
+            overflow: hidden;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 16px 20px 8px;
+            border-bottom: 1px solid #eef2ff;
+        }
+
+        .list-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #0f2b3d;
+        }
+
+        .badge {
+            background: #eef2ff;
+            border-radius: 40px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #1e40af;
+        }
+
+        .scans-list {
+            list-style: none;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .scan-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid #f0f2f8;
+            transition: background 0.15s;
+            gap: 12px;
+        }
+
+        .scan-item:active {
+            background: #f8fafc;
+        }
+
+        .code-text {
+            font-family: 'SF Mono', 'Menlo', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #0f172a;
+            word-break: break-all;
+            flex: 1;
+            letter-spacing: 0.2px;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            color: #94a3b8;
+            padding: 6px;
+            border-radius: 40px;
+            transition: 0.1s;
+            line-height: 1;
+        }
+
+        .delete-btn:active {
+            color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        /* уведомления */
+        .toast-msg {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 60px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+            max-width: 90vw;
+            white-space: normal;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            background: rgba(0,0,0,0.8);
+        }
+
+        .toast-msg.show {
+            opacity: 1;
+        }
+
+        /* вспомогательные */
+        .hidden {
+            display: none !important;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="header">
+        <h1>Акцизный сканер</h1>
+        <p>Автоматическое распознавание марок и кодов ЧЗ</p>
+    </div>
+
+    <div class="camera-panel">
+        <div class="video-wrapper">
+            <video id="videoElement" autoplay playsinline muted></video>
+            <canvas id="canvasOverlay"></canvas>
+        </div>
+        <div class="camera-controls">
+            <button id="startCameraBtn" class="btn btn-primary">📷 Запустить камеру</button>
+            <button id="stopCameraBtn" class="btn btn-outline" disabled>⏹️ Остановить</button>
+        </div>
+    </div>
+
+    <div class="list-section">
+        <div class="list-header">
+            <h2>Отсканированные коды</h2>
+            <span id="countBadge" class="badge">0</span>
+        </div>
+        <ul id="scansList" class="scans-list">
+            <li class="empty-state">✨ Отсканируйте акцизную марку или код Честного знака</li>
+        </ul>
+        <div style="padding: 16px 20px 20px; border-top: 1px solid #eef2ff;">
+            <button id="exportExcelBtn" class="btn btn-export" style="width:100%">📎 Экспорт в Excel</button>
+        </div>
+    </div>
+</div>
+<div id="toastMessage" class="toast-msg"></div>
+
+<script>
+    // --- DOM элементы ---
+    const videoElement = document.getElementById('videoElement');
+    const overlayCanvas = document.getElementById('canvasOverlay');
+    const ctx = overlayCanvas.getContext('2d');
+    const startBtn = document.getElementById('startCameraBtn');
+    const stopBtn = document.getElementById('stopCameraBtn');
+    const scansListEl = document.getElementById('scansList');
+    const countBadge = document.getElementById('countBadge');
+    const exportBtn = document.getElementById('exportExcelBtn');
+    const toast = document.getElementById('toastMessage');
+
+    // --- Состояние приложения ---
+    let scannedCodes = [];          // массив объектов { text, timestamp }
+    let currentReader = null;       // экземпляр ZXing BrowserMultiFormatReader
+    let currentStream = null;       // MediaStream для остановки
+    let isScanning = false;
+    let frameTimer = null;           // таймер для очистки рамки
+    let lastBoxPoints = null;        // последние точки для рамки
+
+    // --- Вспомогательные функции ---
+    function showToast(message, duration = 1800) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
+    // Обновление списка в UI
+    function updateScansList() {
+        if (!scansListEl) return;
+        // очищаем список, кроме возможного пустого сообщения
+        while (scansListEl.firstChild) {
+            scansListEl.removeChild(scansListEl.firstChild);
+        }
+
+        if (scannedCodes.length === 0) {
+            const emptyLi = document.createElement('li');
+            emptyLi.className = 'empty-state';
+            emptyLi.innerText = '📭 Нет отсканированных кодов. Наведите камеру на марку.';
+            scansListEl.appendChild(emptyLi);
+            countBadge.innerText = '0';
+            return;
+        }
+
+        countBadge.innerText = scannedCodes.length;
+        // выводим в обратном порядке (новые сверху)
+        [...scannedCodes].reverse().forEach((item, idx) => {
+            const li = document.createElement('li');
+            li.className = 'scan-item';
+            const span = document.createElement('span');
+            span.className = 'code-text';
+            span.innerText = item.text;
+            const delBtn = document.createElement('button');
+            delBtn.innerText = '🗑️';
+            delBtn.className = 'delete-btn';
+            delBtn.setAttribute('aria-label', 'Удалить');
+            // находим реальный индекс в исходном массиве для удаления
+            const originalIndex = scannedCodes.findIndex(c => c.text === item.text && c.timestamp === item.timestamp);
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (originalIndex !== -1) {
+                    scannedCodes.splice(originalIndex, 1);
+                    updateScansList();
+                    showToast('Код удалён');
+                }
+            });
+            li.appendChild(span);
+            li.appendChild(delBtn);
+            scansListEl.appendChild(li);
+        });
+    }
+
+    // Добавление нового кода в список (без дубликатов)
+    function addScannedCode(codeText) {
+        if (!codeText || codeText.trim() === '') return false;
+        const normalized = codeText.trim();
+        // проверка на существование
+        const alreadyExists = scannedCodes.some(item => item.text === normalized);
+        if (alreadyExists) {
+            // код уже есть в списке, не добавляем повторно, но рамка будет показана
+            return false;
+        }
+        scannedCodes.unshift({ text: normalized, timestamp: Date.now() }); // добавляем в начало (новые сверху)
+        updateScansList();
+        showToast(`✅ Новый код: ${normalized.length > 24 ? normalized.slice(0, 22) + '…' : normalized}`);
+        // вибрация если поддерживается (мобильное приятное дополнение)
+        if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(80);
+        }
+        return true;
+    }
+
+    // --- Рисование зелёной рамки по точкам от ZXing ---
+    function drawBoundingBox(points) {
+        if (!ctx || !overlayCanvas) return;
+        // синхронизация размера canvas с видео
+        const videoRect = videoElement.getBoundingClientRect();
+        const wrapperRect = overlayCanvas.parentElement.getBoundingClientRect();
+        overlayCanvas.width = wrapperRect.width;
+        overlayCanvas.height = wrapperRect.height;
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        if (!points || points.length < 3) return;
+
+        // получаем реальные размеры видео элемента (внутренние пропорции)
+        const videoWidth = videoElement.videoWidth;
+        const videoHeight = videoElement.videoHeight;
+        if (videoWidth === 0 || videoHeight === 0) return;
+
+        // коэффициенты масштабирования от видео-пикселей к canvas-пикселям
+        const scaleX = overlayCanvas.width / videoWidth;
+        const scaleY = overlayCanvas.height / videoHeight;
+
+        ctx.beginPath();
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 0;
+        // рисуем полилинию, соединяя точки
+        const first = points[0];
+        let moveX = first.x * scaleX;
+        let moveY = first.y * scaleY;
+        ctx.moveTo(moveX, moveY);
+        for (let i = 1; i < points.length; i++) {
+            const p = points[i];
+            ctx.lineTo(p.x * scaleX, p.y * scaleY);
+        }
+        // замыкаем если минимум 3 точки
+        if (points.length > 2) {
+            ctx.closePath();
+        }
+        ctx.stroke();
+        // добавим легкую внутреннюю подсветку
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = '#22c55e';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // сброс рамки (очистка canvas)
+    function clearOverlay() {
+        if (ctx && overlayCanvas) {
+            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+        lastBoxPoints = null;
+    }
+
+    // установить таймер для автоматической очистки рамки через 800 мс
+    function resetFrameTimer() {
+        if (frameTimer) clearTimeout(frameTimer);
+        frameTimer = setTimeout(() => {
+            clearOverlay();
+        }, 700);
+    }
+
+    // --- Обработка успешного декодирования ---
+    function onCodeDecode(result) {
+        if (!isScanning) return;
+        if (!result) return;
+        const codeText = result.getText ? result.getText() : (result.text || '');
+        if (!codeText) return;
+
+        // Получаем точки для отрисовки рамки (ZXing возвращает ResultPoint[])
+        let points = null;
+        if (result.getResultPoints && typeof result.getResultPoints === 'function') {
+            points = result.getResultPoints();
+        } else if (result.points) {
+            points = result.points;
+        }
+        if (points && points.length) {
+            drawBoundingBox(points);
+            resetFrameTimer();
+        } else {
+            // если нет точек, но есть текст — всё равно сбросим предыдущую рамку и покажем кратковременный визуальный фидбек
+            clearOverlay();
+            // быстро нарисуем мигающий зелёный уголок? но достаточно просто добавим через toast
+        }
+        // Добавляем код в историю (если новый)
+        addScannedCode(codeText);
+    }
+
+    // --- Запуск камеры и инициализация сканера через ZXing ---
+    async function startCamera() {
+        if (isScanning) {
+            showToast('Камера уже работает');
+            return;
+        }
+
+        try {
+            // запрос доступа к камере (получим поток, чтобы потом остановить)
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            currentStream = stream;
+            videoElement.srcObject = stream;
+            await videoElement.play();
+
+            // убедимся что видео отобразилось, подстроим canvas
+            await new Promise((resolve) => {
+                if (videoElement.videoWidth > 0) resolve();
+                else videoElement.onloadedmetadata = () => resolve();
+            });
+
+            // Синхронизация canvas
+            const wrapper = overlayCanvas.parentElement;
+            const rect = wrapper.getBoundingClientRect();
+            overlayCanvas.width = rect.width;
+            overlayCanvas.height = rect.height;
+
+            // Инициализация ZXing MultiFormatReader
+            const { BrowserMultiFormatReader } = ZXing;
+            const reader = new BrowserMultiFormatReader();
+            currentReader = reader;
+
+            // Запуск непрерывного сканирования из video элемента (автоматическое распознавание)
+            // Используем decodeFromVideoElement, который вызывает callback при каждом успешном декодировании
+            // Важно: видео элемент уже имеет поток, и reader будет использовать его.
+            // Но decodeFromVideoElement запрашивает поток повторно? Лучше передать уже существующий videoElement, reader использует его без повторного запроса.
+            await reader.decodeFromVideoElement(videoElement, (result, err) => {
+                if (!isScanning) return;
+                if (result) {
+                    onCodeDecode(result);
+                }
+                // ошибки игнорируем, если это не критические (например, если кадр не содержит кода - норма)
+                if (err && err.name !== 'NotFoundException' && err.name !== 'ChecksumException') {
+                    console.warn('ZXing error:', err);
+                }
+            });
+
+            isScanning = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            showToast('Камера активна. Наведите на акцизную марку / Data Matrix', 2500);
+            // Убираем старую рамку
+            clearOverlay();
+        } catch (error) {
+            console.error('Camera error:', error);
+            let errorMsg = 'Не удалось получить доступ к камере. ';
+            if (error.name === 'NotAllowedError') errorMsg += 'Разрешение отклонено.';
+            else if (error.name === 'NotFoundError') errorMsg += 'Камера не найдена.';
+            else errorMsg += 'Проверьте права и HTTPS.';
+            showToast(errorMsg, 3000);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isScanning = false;
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+        }
+    }
+
+    // --- Остановка камеры и освобождение ресурсов ---
+    async function stopCamera() {
+        if (!isScanning && !currentReader && !currentStream) {
+            showToast('Камера не активна');
+            return;
+        }
+        try {
+            if (currentReader && currentReader.reset) {
+                await currentReader.reset();
+            }
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                currentStream = null;
+            }
+            videoElement.srcObject = null;
+            videoElement.pause();
+            isScanning = false;
+            currentReader = null;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            clearOverlay();
+            if (frameTimer) clearTimeout(frameTimer);
+            showToast('Камера остановлена');
+        } catch (e) {
+            console.warn('stop error', e);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isScanning = false;
+        }
+    }
+
+    // --- Экспорт в Excel (CSV с разделителями, но с расширением .xls) ---
+    function exportToExcel() {
+        if (scannedCodes.length === 0) {
+            showToast('Нет данных для экспорта. Сначала отсканируйте коды.', 2000);
+            return;
+        }
+        // формируем содержимое: каждая акциза с новой строки, без заголовков, как просили "каждая акциза с новой строки"
+        // дополнительно можно добавить простой заголовок, но согласно заданию: просто список акциз
+        let content = "";
+        scannedCodes.forEach(item => {
+            content += item.text + "\n";
+        });
+        // создаём Blob с типом для Excel (application/vnd.ms-excel)
+        const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8;" });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const now = new Date();
+        const filename = `акцизы_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}_${now.getHours()}-${now.getMinutes()}.xls`;
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast(`Экспортировано ${scannedCodes.length} кодов`, 1800);
+    }
+
+    // --- Обработка изменения размера экрана (для корректной отрисовки рамки) ---
+    function resizeCanvas() {
+        if (!isScanning) return;
+        const wrapper = overlayCanvas.parentElement;
+        if (wrapper) {
+            const rect = wrapper.getBoundingClientRect();
+            overlayCanvas.width = rect.width;
+            overlayCanvas.height = rect.height;
+            // если последняя рамка была, перерисуем? Можно, но проще дождаться следующего сканирования
+        }
+    }
+
+    // --- Инициализация, обработчики событий ---
+    function init() {
+        startBtn.addEventListener('click', startCamera);
+        stopBtn.addEventListener('click', stopCamera);
+        exportBtn.addEventListener('click', exportToExcel);
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            if (lastBoxPoints) drawBoundingBox(lastBoxPoints);
+        });
+        // если вкладка скрыта – не обновляем рамку агрессивно, но всё ок
+        // принудительная остановка при закрытии страницы
+        window.addEventListener('beforeunload', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
+        });
+        updateScansList();
+    }
+
+    init();
+</script>
+</body>
+</html>
