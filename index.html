@@ -12,12 +12,12 @@
     <style>
         :root {
             --primary: #2563eb;
-            --primary-dark: #1d4ed8;
             --bg: #f8fafc;
             --surface: #ffffff;
             --text: #1e293b;
             --text-sec: #64748b;
             --success: #10b981;
+            --error: #ef4444;
         }
 
         body {
@@ -32,27 +32,83 @@
             overflow: hidden;
         }
 
-        /* Header */
-        header {
+        /* --- Scanner Area --- */
+        .scanner-wrapper {
+            width: 100%;
+            padding: 16px;
             background: var(--surface);
-            padding: 16px 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
+            position: relative;
             z-index: 10;
         }
 
-        h1 { margin: 0; font-size: 18px; font-weight: 600; }
-
-        /* Main Content */
-        main {
-            flex: 1;            overflow-y: auto;
-            padding: 16px;
-            padding-bottom: 80px; /* Space for FAB */
+        /* Квадратный контейнер для камеры */
+        #scanner-container {
+            width: 100%;            max-width: 400px;
+            aspect-ratio: 1 / 1; /* Делает блок квадратным */
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            border: 4px solid transparent;
+            transition: border-color 0.3s ease;
         }
 
-        /* List Styles */
+        #reader {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Всплывающие сообщения статуса сканирования */
+        .scan-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 20;
+        }
+
+        /* Кнопка вспышки */
+        .torch-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            z-index: 30;
+        }        .torch-btn.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+        }
+
+        /* --- List Area --- */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
         .list-header {
             display: flex;
             justify-content: space-between;
@@ -85,22 +141,19 @@
             justify-content: space-between;
             align-items: center;
             animation: slideIn 0.3s ease;
-            max-width: 100%;
         }
 
         .item-code {
             font-family: monospace;
-            font-size: 14px;
-            color: var(--text);
-            /* Ключевое свойство для переноса длинных кодов */
-            word-break: break-all; 
+            font-size: 14px;            color: var(--text);
+            word-break: break-all;
             margin-right: 10px;
         }
+
         .item-time {
             font-size: 11px;
             color: var(--text-sec);
             margin-top: 4px;
-            white-space: nowrap;
         }
 
         @keyframes slideIn {
@@ -108,7 +161,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Empty State */
         .empty-state {
             text-align: center;
             color: var(--text-sec);
@@ -116,7 +168,7 @@
             font-size: 14px;
         }
 
-        /* Floating Action Button (Scan) */
+        /* --- Floating Action Button --- */
         .fab-container {
             position: fixed;
             bottom: 24px;
@@ -124,77 +176,31 @@
             right: 0;
             display: flex;
             justify-content: center;
-            gap: 16px;
             z-index: 20;
-            padding: 0 16px;
         }
 
-        .btn {
+        .btn-export {
             border: none;
-            padding: 16px 24px;
+            padding: 16px 32px;
             border-radius: 50px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.1s;
+            background-color: var(--surface);
+            color: var(--text);
             display: flex;
             align-items: center;
             gap: 8px;
         }
-
-        .btn:active { transform: scale(0.95); }
-
-        .btn-scan {            background-color: var(--primary);
-            color: white;
-            flex: 2;
-            justify-content: center;
-        }
-
-        .btn-export {
-            background-color: var(--surface);
-            color: var(--text);
-            flex: 1;
-            justify-content: center;
-        }
-
-        /* Modal / Scanner Overlay */
-        #scanner-modal {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: black;
-            z-index: 100;
-            display: none; /* Hidden by default */
-            flex-direction: column;
-        }
-
-        #reader {
-            width: 100%;
-            height: 100%;
-        }
-
-        .scanner-controls {
-            position: absolute;
-            bottom: 30px;
-            width: 100%;
-            text-align: center;
-        }
-
-        .btn-close {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-
-        /* Toast Notification */
+        .btn-export:active { transform: scale(0.95); }
+        /* Toast */
         #toast {
             visibility: hidden;
             min-width: 250px;
             background-color: var(--success);
-            color: #fff;            text-align: center;
+            color: #fff;
+            text-align: center;
             border-radius: 8px;
             padding: 16px;
             position: fixed;
@@ -214,19 +220,30 @@
             opacity: 1;
             bottom: 110px;
         }
+        
+        /* Классы для рамки */
+        .border-success { border-color: var(--success) !important; box-shadow: 0 0 15px var(--success); }
+        .border-error { border-color: var(--error) !important; box-shadow: 0 0 15px var(--error); }
 
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Сканер Марок</h1>
-        <div id="total-count" class="count-badge">0</div>
-    </header>
+    <!-- Блок сканера -->
+    <div class="scanner-wrapper">
+        <div id="scanner-container">
+            <div id="reader"></div>
+            <button class="torch-btn" id="torch-btn" onclick="toggleTorch()" style="display: none;">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+            </button>
+            <div id="scan-status-msg" class="scan-status"></div>
+        </div>
+    </div>
 
+    <!-- Список -->
     <main>
         <div class="list-header">
-            <span style="font-size: 14px; color: var(--text-sec); font-weight: 500;">Список отсканированных</span>
+            <span style="font-size: 14px; color: var(--text-sec); font-weight: 500;">Результаты</span>            <div id="total-count" class="count-badge">0</div>
         </div>
         
         <ul id="scanned-list">
@@ -234,113 +251,125 @@
         </ul>
 
         <div id="empty-msg" class="empty-state">
-            Список пуст.<br>Нажмите кнопку сканирования.
+            Наведите камеру на код.<br>Сканирование происходит автоматически.
         </div>
     </main>
 
-    <!-- Кнопки действий -->
+    <!-- Кнопка экспорта -->
     <div class="fab-container">
-        <button class="btn btn-export" onclick="exportToExcel()">
+        <button class="btn-export" onclick="exportToExcel()">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
-            Excel
-        </button>        <button class="btn btn-scan" onclick="startScanner()">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            Сканировать
+            Скачать Excel
         </button>
-    </div>
-
-    <!-- Модальное окно сканера -->
-    <div id="scanner-modal">
-        <div id="reader"></div>
-        <div class="scanner-controls">
-            <button class="btn btn-close" onclick="stopScanner()">Закрыть камеру</button>
-        </div>
     </div>
 
     <!-- Всплывающее уведомление -->
     <div id="toast">Код добавлен!</div>
 
     <script>
-        // --- Состояние приложения ---
-        let scannedCodes = new Set(); // Используем Set для автоматической уникальности
+        // --- Состояние ---
+        let scannedCodes = new Set();
         let html5QrcodeScanner = null;
-        let isScanning = false;
-
+        let isTorchOn = false;
+        const container = document.getElementById('scanner-container');
+        const torchBtn = document.getElementById('torch-btn');
+        const statusMsg = document.getElementById('scan-status-msg');
         const listElement = document.getElementById('scanned-list');
         const emptyMsg = document.getElementById('empty-msg');
         const countBadge = document.getElementById('total-count');
         const toast = document.getElementById('toast');
 
-        // --- Логика сканирования ---
+        // --- Запуск сканера при загрузке ---
+        window.addEventListener('load', () => {
+            startScanner();
+        });
 
         function startScanner() {
-            document.getElementById('scanner-modal').style.display = 'flex';
+            html5QrcodeScanner = new Html5Qrcode("reader");
             
-            // Инициализируем сканер только если он еще не создан
-            if (!html5QrcodeScanner) {
-                html5QrcodeScanner = new Html5Qrcode("reader");
-            }
-
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            
-            // Запрашиваем заднюю камеру
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+                        html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            .then(() => {
+                torchBtn.style.display = 'flex'; // Показать кнопку вспышки, если камера работает
+            })
             .catch(err => {
                 console.error("Ошибка запуска камеры", err);
-                alert("Не удалось запустить камеру. Убедитесь, что сайт открыт по HTTPS и даны разрешения.");
-                stopScanner();
+                alert("Ошибка доступа к камере. Убедитесь, что сайт открыт по HTTPS.");
             });
-            
-            isScanning = true;
-        }
-        function stopScanner() {
-            if (html5QrcodeScanner && isScanning) {
-                html5QrcodeScanner.stop().then(() => {
-                    document.getElementById('scanner-modal').style.display = 'none';
-                    isScanning = false;
-                }).catch(err => console.error(err));
-            } else {
-                document.getElementById('scanner-modal').style.display = 'none';
-            }
         }
 
+        // --- Логика вспышки ---
+        function toggleTorch() {
+            if (!html5QrcodeScanner) return;
+
+            isTorchOn = !isTorchOn;
+            html5QrcodeScanner.applyTorch(isTorchOn)
+                .then(() => {
+                    if (isTorchOn) {
+                        torchBtn.classList.add('active');
+                    } else {
+                        torchBtn.classList.remove('active');
+                    }
+                })
+                .catch(err => {
+                    console.error("Ошибка вспышки", err);
+                    // Откат состояния если ошибка
+                    isTorchOn = !isTorchOn; 
+                    alert("Вспышка не поддерживается этим устройством или браузером.");
+                });
+        }
+
+        // --- Логика сканирования ---
         function onScanSuccess(decodedText, decodedResult) {
-            // Обработка успешного сканирования
-            
-            // 1. Вибрация (работает на Android)
-            if (navigator.vibrate) {
-                navigator.vibrate(200);
-            }
-
-            // 2. Проверка на дубликат
+            // Проверка на дубликат
             if (scannedCodes.has(decodedText)) {
-                return; // Если уже есть, игнорируем
+                flashBorder('error', 'Дубликат!');
+                return;
             }
 
-            // 3. Добавляем в список
+            // Успешное сканирование
             scannedCodes.add(decodedText);
             addToList(decodedText);
+            flashBorder('success', 'Успешно!');
+            
+            // Вибрация
+            if (navigator.vibrate) navigator.vibrate(200);
+            
+            // Тост
+            showToast(decodedText);
+        }
+        // Визуальная обратная связь (рамка)
+        function flashBorder(type, text) {
+            // Убираем старые классы
+            container.classList.remove('border-success', 'border-error');
+            
+            // Показываем текст
+            statusMsg.textContent = text;
+            statusMsg.style.opacity = '1';
 
-            // 4. Показываем тост (теперь текст полностью совпадает со списком)
-            // Ограничим длину только для тоста, если она слишком большая, чтобы не закрыть весь экран,
-            // но в списке будет полный текст, как вы просили.
-            let toastText = decodedText;
-            if (decodedText.length > 50) {
-                 toastText = decodedText.substring(0, 47) + "...";
+            // Добавляем нужный класс
+            if (type === 'success') {
+                container.classList.add('border-success');
+            } else {
+                container.classList.add('border-error');
             }
-            showToast(toastText);
 
-            // Примечание: Мы НЕ останавливаем сканер, он продолжит работать автоматически
+            // Сброс через 500мс
+            setTimeout(() => {
+                container.classList.remove('border-success', 'border-error');
+                statusMsg.style.opacity = '0';
+            }, 500);
         }
 
-        // --- Логика интерфейса ---
-
+        // --- Логика списка ---
         function addToList(text) {
             emptyMsg.style.display = 'none';
             countBadge.textContent = scannedCodes.size;
 
-            // Теперь мы выводим текст БЕЗ обрезки, точно так же, как он пришел со сканера
-            let displayText = text;
             const li = document.createElement('li');
             li.className = 'list-item';
             
@@ -349,40 +378,35 @@
 
             li.innerHTML = `
                 <div style="overflow: hidden;">
-                    <div class="item-code">${displayText}</div>
+                    <div class="item-code">${text}</div>
                     <div class="item-time">${timeString}</div>
                 </div>
                 <div style="color: var(--success); flex-shrink: 0; margin-left: 10px;">✓</div>
             `;
             
-            // Добавляем в начало списка
             listElement.prepend(li);
         }
 
         function showToast(message) {
             toast.textContent = message;
             toast.className = "show";
-            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2500);
-        }
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2000);        }
 
-        // --- Экспорт в Excel ---
-
+        // --- Экспорт в Excel (Только коды) ---
         function exportToExcel() {
             if (scannedCodes.size === 0) {
                 alert("Список пуст!");
                 return;
             }
 
-            // Преобразуем Set в массив объектов для Excel
-            const data = Array.from(scannedCodes).map(code => ({
-                "Код марки": code
-            }));
+            // Создаем массив массивов (AOA) для чистого экспорта без заголовков
+            // [['Код1'], ['Код2'], ...]
+            const data = Array.from(scannedCodes).map(code => [code]);
 
-            const ws = XLSX.utils.json_to_sheet(data);
+            const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
 
-            // Генерируем имя файла с датой
             const date = new Date().toISOString().slice(0,10);
             XLSX.writeFile(wb, `Scan_Result_${date}.xlsx`);
         }
