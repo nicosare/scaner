@@ -131,7 +131,6 @@
         .stats {
             display: flex;
             justify-content: center;
-            gap: 24px;
             padding: 12px;
             background: #1a1a1a;
             border-bottom: 1px solid #333;
@@ -142,7 +141,7 @@
         }
 
         .stat-value {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
             color: #00ff88;
         }
@@ -226,12 +225,6 @@
             word-break: break-all;
             flex: 1;
             margin-right: 12px;
-        }
-
-        .code-time {
-            font-size: 10px;
-            color: #888;
-            white-space: nowrap;
         }
 
         .delete-btn {
@@ -382,10 +375,6 @@
             <div class="stat-value" id="count">0</div>
             <div class="stat-label">Отсканировано</div>
         </div>
-        <div class="stat">
-            <div class="stat-value" id="unique">0</div>
-            <div class="stat-label">Уникальных</div>
-        </div>
     </div>
 
     <div class="list-container">
@@ -417,11 +406,11 @@
             initScanner();
         }
 
-        function initScanner() {
+        async function initScanner() {
             html5QrCode = new Html5Qrcode("reader");
             
             const config = {
-                fps: 10,
+                fps: 15,
                 qrbox: { width: 200, height: 200 },
                 aspectRatio: 1.0,
                 formatsToSupport: [
@@ -429,14 +418,38 @@
                 ]
             };
 
-            html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                onScanSuccess,
-                onScanFailure
-            ).catch(err => {
+            // Настройки камеры с автофокусом
+            const cameraConfig = {
+                facingMode: "environment",
+                advanced: [{
+                    focusMode: "continuous"
+                }]
+            };
+
+            try {
+                await html5QrCode.start(
+                    cameraConfig,
+                    config,
+                    onScanSuccess,
+                    onScanFailure
+                );
+                
+                // Пытаемся применить дополнительные настройки фокуса через track
+                const videoElement = document.querySelector('#reader video');
+                if (videoElement && videoElement.srcObject) {
+                    const track = videoElement.srcObject.getVideoTracks()[0];
+                    if (track && track.getCapabilities) {
+                        const capabilities = track.getCapabilities();
+                        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                            track.applyConstraints({
+                                advanced: [{ focusMode: 'continuous' }]
+                            }).catch(() => {});
+                        }
+                    }
+                }
+            } catch (err) {
                 showToast('Ошибка доступа к камере: ' + err);
-            });
+            }
         }
 
         function onScanSuccess(decodedText, decodedResult) {
@@ -454,7 +467,6 @@
             uniqueCodes.add(decodedText);
             const codeData = {
                 code: decodedText,
-                timestamp: new Date(),
                 id: Date.now()
             };
             scannedCodes.unshift(codeData);
@@ -469,9 +481,8 @@
         }
 
         function updateUI() {
-            // Обновляем счетчики
+            // Обновляем счетчик
             document.getElementById('count').textContent = scannedCodes.length;
-            document.getElementById('unique').textContent = uniqueCodes.size;
 
             // Обновляем список
             const listContainer = document.getElementById('codesList');
@@ -491,10 +502,7 @@
 
             listContainer.innerHTML = scannedCodes.map((item, index) => `
                 <div class="code-item ${index === 0 ? 'new' : ''}">
-                    <div>
-                        <div class="code-text">${escapeHtml(item.code)}</div>
-                        <div class="code-time">${formatTime(item.timestamp)}</div>
-                    </div>
+                    <div class="code-text">${escapeHtml(item.code)}</div>
                     <button class="delete-btn" onclick="deleteCode(${item.id})">×</button>
                 </div>
             `).join('');
@@ -522,41 +530,22 @@
         function exportToExcel() {
             if (scannedCodes.length === 0) return;
 
-            // Создаем данные для Excel
-            const data = scannedCodes.map((item, index) => ({
-                '№': index + 1,
-                'Код маркировки': item.code,
-                'Дата': item.timestamp.toLocaleDateString('ru-RU'),
-                'Время': item.timestamp.toLocaleTimeString('ru-RU')
-            }));
+            // Создаем данные для Excel - только коды, без заголовков
+            const data = scannedCodes.map(item => [item.code]);
 
             // Создаем workbook
-            const ws = XLSX.utils.json_to_sheet(data);
+            const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Акцизные марки');
 
-            // Автоматическая ширина колонок
-            const colWidths = [
-                { wch: 5 },   // №
-                { wch: 60 },  // Код
-                { wch: 12 },  // Дата
-                { wch: 10 }   // Время
-            ];
-            ws['!cols'] = colWidths;
+            // Ширина колонки
+            ws['!cols'] = [{ wch: 80 }];
 
             // Скачиваем файл
             const fileName = `Акцизы_${new Date().toLocaleDateString('ru-RU')}.xlsx`;
             XLSX.writeFile(wb, fileName);
 
             showToast('Файл сохранен!');
-        }
-
-        function formatTime(date) {
-            return date.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            });
         }
 
         function escapeHtml(text) {
