@@ -1,572 +1,129 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Сканер акцизных марок</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <title>Сканер акцизов</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #0a0a0a;
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+  <!-- Библиотеки -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-        .header {
-            text-align: center;
-            padding: 12px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #333;
-        }
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+    }
 
-        .header h1 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #fff;
-        }
+    #video {
+      width: 90vw;
+      height: 90vw;
+      max-width: 400px;
+      max-height: 400px;
+      margin-top: 10px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 2px solid #444;
+    }
 
-        .header .subtitle {
-            font-size: 12px;
-            color: #888;
-            margin-top: 2px;
-        }
+    #list {
+      margin: 10px;
+      max-height: 40vh;
+      overflow-y: auto;
+      text-align: left;
+      padding: 10px;
+      background: #1e1e1e;
+      border-radius: 10px;
+    }
 
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 16px auto;
-            aspect-ratio: 1;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 2px solid #333;
-        }
-
-        #reader {
-            width: 100%;
-            height: 100%;
-        }
-
-        #reader video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover;
-            transform: scale(2.5);
-        }
-
-        .scanner-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70%;
-            height: 70%;
-            border: 2px solid #00ff88;
-            border-radius: 8px;
-            pointer-events: none;
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-        }
-
-        .scanner-overlay::before,
-        .scanner-overlay::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border-color: #00ff88;
-            border-style: solid;
-        }
-
-        .scanner-overlay::before {
-            top: -2px;
-            left: -2px;
-            border-width: 3px 0 0 3px;
-        }
-
-        .scanner-overlay::after {
-            bottom: -2px;
-            right: -2px;
-            border-width: 0 3px 3px 0;
-        }
-
-        .scan-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #00ff88, transparent);
-            animation: scan 2s linear infinite;
-        }
-
-        @keyframes scan {
-            0% { top: 0; }
-            100% { top: 100%; }
-        }
-
-        .zoom-indicator {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            color: #00ff88;
-        }
-
-        .stats {
-            display: flex;
-            justify-content: center;
-            padding: 12px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #333;
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: #00ff88;
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: #888;
-            text-transform: uppercase;
-        }
-
-        .list-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-            padding-bottom: 100px;
-        }
-
-        .list-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .list-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #ccc;
-        }
-
-        .clear-btn {
-            background: #ff4444;
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .clear-btn:active {
-            opacity: 0.8;
-        }
-
-        .codes-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .code-item {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .code-item.new {
-            border-color: #00ff88;
-            background: #0a2a1a;
-        }
-
-        .code-text {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            color: #fff;
-            word-break: break-all;
-            flex: 1;
-            margin-right: 12px;
-        }
-
-        .delete-btn {
-            background: transparent;
-            border: none;
-            color: #ff4444;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 4px 8px;
-            margin-left: 8px;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .empty-state-text {
-            font-size: 14px;
-        }
-
-        .export-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #00cc6a, #00ff88);
-            color: #000;
-            border: none;
-            padding: 16px 32px;
-            border-radius: 28px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 100;
-        }
-
-        .export-btn:active {
-            transform: translateX(-50%) scale(0.98);
-        }
-
-        .export-btn:disabled {
-            background: #333;
-            color: #666;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        .toast {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #00ff88;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 14px;
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-            border: 1px solid #00ff88;
-        }
-
-        .toast.show {
-            opacity: 1;
-        }
-
-        .start-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #0a0a0a;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .start-btn {
-            background: linear-gradient(135deg, #00cc6a, #00ff88);
-            color: #000;
-            border: none;
-            padding: 20px 40px;
-            border-radius: 32px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 24px;
-        }
-
-        .start-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-        }
-
-        .start-text {
-            text-align: center;
-            color: #888;
-            padding: 0 40px;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-    </style>
+    button {
+      margin: 10px;
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #4CAF50;
+      color: white;
+    }
+  </style>
 </head>
 <body>
-    <div class="start-screen" id="startScreen">
-        <div class="start-icon">📷</div>
-        <div class="start-text">
-            Наведите камеру на DataMatrix код акцизной марки или маркировки «Честный ЗНАК»
-        </div>
-        <button class="start-btn" onclick="startScanner()">Начать сканирование</button>
-    </div>
 
-    <div class="header">
-        <h1>Сканер акцизных марок</h1>
-        <div class="subtitle">DataMatrix (ECC 200) • Честный ЗНАК</div>
-    </div>
+<h3>Сканер акцизных марок</h3>
 
-    <div class="camera-container">
-        <div id="reader"></div>
-        <div class="scanner-overlay">
-            <div class="scan-line"></div>
-        </div>
-        <div class="zoom-indicator">2.5×</div>
-    </div>
+<video id="video" autoplay muted playsinline></video>
 
-    <div class="stats">
-        <div class="stat">
-            <div class="stat-value" id="count">0</div>
-            <div class="stat-label">Отсканировано</div>
-        </div>
-    </div>
+<div>
+  <button onclick="exportExcel()">Экспорт в Excel</button>
+</div>
 
-    <div class="list-container">
-        <div class="list-header">
-            <span class="list-title">Список кодов</span>
-            <button class="clear-btn" onclick="clearAll()">Очистить</button>
-        </div>
-        <div class="codes-list" id="codesList">
-            <div class="empty-state">
-                <div class="empty-state-icon">📋</div>
-                <div class="empty-state-text">Нет отсканированных кодов</div>
-            </div>
-        </div>
-    </div>
+<div id="list"></div>
 
-    <button class="export-btn" id="exportBtn" onclick="exportToExcel()" disabled>
-        📥 Экспорт в Excel
-    </button>
+<script>
+  const video = document.getElementById('video');
+  const list = document.getElementById('list');
 
-    <div class="toast" id="toast"></div>
+  const scannedSet = new Set();
 
-    <script>
-        let html5QrCode;
-        let scannedCodes = [];
-        let uniqueCodes = new Set();
+  async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment"
+      }
+    });
 
-        function startScanner() {
-            document.getElementById('startScreen').classList.add('hidden');
-            initScanner();
+    video.srcObject = stream;
+
+    // Пытаемся установить zoom x2.5
+    const track = stream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities();
+
+    if (capabilities.zoom) {
+      track.applyConstraints({
+        advanced: [{ zoom: Math.min(capabilities.zoom.max, 2.5) }]
+      });
+    }
+  }
+
+  async function startScanner() {
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+
+    codeReader.decodeFromVideoDevice(null, video, (result, err) => {
+      if (result) {
+        const text = result.text;
+
+        if (!scannedSet.has(text)) {
+          scannedSet.add(text);
+
+          // Вибрация
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+
+          const div = document.createElement('div');
+          div.textContent = text;
+          list.appendChild(div);
         }
+      }
+    });
+  }
 
-        async function initScanner() {
-            html5QrCode = new Html5Qrcode("reader");
+  function exportExcel() {
+    const data = Array.from(scannedSet).map(code => [code]);
 
-            const config = {
-                fps: 15,
-                qrbox: { width: 200, height: 200 },
-                aspectRatio: 1.0,
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.DATA_MATRIX
-                ]
-            };
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
 
-            try {
-                // Исправлено: передаем только строку "environment" вместо объекта
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    onScanSuccess,
-                    onScanFailure
-                );
+    XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
 
-                // Применяем настройки фокуса после запуска
-                setTimeout(() => {
-                    const videoElement = document.querySelector('#reader video');
-                    if (videoElement && videoElement.srcObject) {
-                        const track = videoElement.srcObject.getVideoTracks()[0];
-                        if (track && track.getCapabilities) {
-                            const capabilities = track.getCapabilities();
-                            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                                track.applyConstraints({
-                                    advanced: [{ focusMode: 'continuous' }]
-                                }).catch(() => {});
-                            }
-                        }
-                    }
-                }, 1000);
+    XLSX.writeFile(wb, "excise_codes.xlsx");
+  }
 
-            } catch (err) {
-                showToast('Ошибка доступа к камере: ' + err.message);
-                console.error('Camera error:', err);
-            }
-        }
+  startCamera().then(startScanner);
+</script>
 
-        function onScanSuccess(decodedText, decodedResult) {
-            // Проверяем, не сканировали ли уже этот код
-            if (uniqueCodes.has(decodedText)) {
-                return; // Игнорируем дубликаты
-            }
-
-            // Вибрация
-            if (navigator.vibrate) {
-                navigator.vibrate(200);
-            }
-
-            // Добавляем код
-            uniqueCodes.add(decodedText);
-            const codeData = {
-                code: decodedText,
-                id: Date.now()
-            };
-            scannedCodes.unshift(codeData);
-
-            // Обновляем UI
-            updateUI();
-            showToast('Код отсканирован!');
-        }
-
-        function onScanFailure(error) {
-            // Игнорируем ошибки сканирования (когда код не найден)
-        }
-
-        function updateUI() {
-            // Обновляем счетчик
-            document.getElementById('count').textContent = scannedCodes.length;
-
-            // Обновляем список
-            const listContainer = document.getElementById('codesList');
-
-            if (scannedCodes.length === 0) {
-                listContainer.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📋</div>
-                        <div class="empty-state-text">Нет отсканированных кодов</div>
-                    </div>
-                `;
-                document.getElementById('exportBtn').disabled = true;
-                return;
-            }
-
-            document.getElementById('exportBtn').disabled = false;
-
-            listContainer.innerHTML = scannedCodes.map((item, index) => `
-                <div class="code-item ${index === 0 ? 'new' : ''}">
-                    <div class="code-text">${escapeHtml(item.code)}</div>
-                    <button class="delete-btn" onclick="deleteCode(${item.id})">×</button>
-                </div>
-            `).join('');
-        }
-
-        function deleteCode(id) {
-            const index = scannedCodes.findIndex(item => item.id === id);
-            if (index > -1) {
-                uniqueCodes.delete(scannedCodes[index].code);
-                scannedCodes.splice(index, 1);
-                updateUI();
-            }
-        }
-
-        function clearAll() {
-            if (scannedCodes.length === 0) return;
-
-            if (confirm('Очистить все отсканированные коды?')) {
-                scannedCodes = [];
-                uniqueCodes.clear();
-                updateUI();
-            }
-        }
-
-        function exportToExcel() {
-            if (scannedCodes.length === 0) return;
-
-            // Создаем данные для Excel - только коды, без заголовков
-            const data = scannedCodes.map(item => [item.code]);
-
-            // Создаем workbook
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Акцизные марки');
-
-            // Ширина колонки
-            ws['!cols'] = [{ wch: 80 }];
-
-            // Скачиваем файл
-            const fileName = `Акцизы_${new Date().toLocaleDateString('ru-RU')}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-
-            showToast('Файл сохранен!');
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 1500);
-        }
-
-        // Останавливаем сканер при закрытии страницы
-        window.addEventListener('beforeunload', () => {
-            if (html5QrCode) {
-                html5QrCode.stop();
-            }
-        });
-    </script>
 </body>
 </html>
