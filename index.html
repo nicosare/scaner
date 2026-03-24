@@ -85,18 +85,22 @@
             justify-content: space-between;
             align-items: center;
             animation: slideIn 0.3s ease;
+            max-width: 100%;
         }
 
         .item-code {
             font-family: monospace;
             font-size: 14px;
             color: var(--text);
-            word-break: break-all;
+            /* Ключевое свойство для переноса длинных кодов */
+            word-break: break-all; 
+            margin-right: 10px;
         }
-
         .item-time {
             font-size: 11px;
-            color: var(--text-sec);            margin-top: 4px;
+            color: var(--text-sec);
+            margin-top: 4px;
+            white-space: nowrap;
         }
 
         @keyframes slideIn {
@@ -122,11 +126,12 @@
             justify-content: center;
             gap: 16px;
             z-index: 20;
+            padding: 0 16px;
         }
 
         .btn {
             border: none;
-            padding: 16px 32px;
+            padding: 16px 24px;
             border-radius: 50px;
             font-size: 16px;
             font-weight: 600;
@@ -140,13 +145,17 @@
 
         .btn:active { transform: scale(0.95); }
 
-        .btn-scan {
-            background-color: var(--primary);
+        .btn-scan {            background-color: var(--primary);
             color: white;
+            flex: 2;
+            justify-content: center;
         }
 
-        .btn-export {            background-color: var(--surface);
+        .btn-export {
+            background-color: var(--surface);
             color: var(--text);
+            flex: 1;
+            justify-content: center;
         }
 
         /* Modal / Scanner Overlay */
@@ -177,6 +186,7 @@
             padding: 10px 20px;
             border-radius: 20px;
             backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.3);
         }
 
         /* Toast Notification */
@@ -184,8 +194,7 @@
             visibility: hidden;
             min-width: 250px;
             background-color: var(--success);
-            color: #fff;
-            text-align: center;
+            color: #fff;            text-align: center;
             border-radius: 8px;
             padding: 16px;
             position: fixed;
@@ -194,8 +203,10 @@
             bottom: 100px;
             transform: translateX(-50%);
             font-size: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);            opacity: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0;
             transition: opacity 0.3s, bottom 0.3s;
+            word-break: break-all;
         }
 
         #toast.show {
@@ -232,8 +243,7 @@
         <button class="btn btn-export" onclick="exportToExcel()">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
             Excel
-        </button>
-        <button class="btn btn-scan" onclick="startScanner()">
+        </button>        <button class="btn btn-scan" onclick="startScanner()">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             Сканировать
         </button>
@@ -243,7 +253,8 @@
     <div id="scanner-modal">
         <div id="reader"></div>
         <div class="scanner-controls">
-            <button class="btn btn-close" onclick="stopScanner()">Закрыть камеру</button>        </div>
+            <button class="btn btn-close" onclick="stopScanner()">Закрыть камеру</button>
+        </div>
     </div>
 
     <!-- Всплывающее уведомление -->
@@ -282,7 +293,6 @@
             
             isScanning = true;
         }
-
         function stopScanner() {
             if (html5QrcodeScanner && isScanning) {
                 html5QrcodeScanner.stop().then(() => {
@@ -293,6 +303,7 @@
                 document.getElementById('scanner-modal').style.display = 'none';
             }
         }
+
         function onScanSuccess(decodedText, decodedResult) {
             // Обработка успешного сканирования
             
@@ -310,8 +321,14 @@
             scannedCodes.add(decodedText);
             addToList(decodedText);
 
-            // 4. Показываем тост
-            showToast(`Найдено: ${decodedText.substring(0, 15)}...`);
+            // 4. Показываем тост (теперь текст полностью совпадает со списком)
+            // Ограничим длину только для тоста, если она слишком большая, чтобы не закрыть весь экран,
+            // но в списке будет полный текст, как вы просили.
+            let toastText = decodedText;
+            if (decodedText.length > 50) {
+                 toastText = decodedText.substring(0, 47) + "...";
+            }
+            showToast(toastText);
 
             // Примечание: Мы НЕ останавливаем сканер, он продолжит работать автоматически
         }
@@ -322,15 +339,8 @@
             emptyMsg.style.display = 'none';
             countBadge.textContent = scannedCodes.size;
 
-            // Очистка кода для отображения (попытка найти короткий код Честного знака)
-            // Обычно полезная часть в конце, или это просто длинная строка
+            // Теперь мы выводим текст БЕЗ обрезки, точно так же, как он пришел со сканера
             let displayText = text;
-            if (text.length > 20) {
-                // Если это DataMatrix (Честный знак), часто полезно показать последние 13 символов (GTIN + Serial)
-                // Но для надежности покажем просто обрезанную строку
-                displayText = text.substring(text.length - 13); 
-            }
-
             const li = document.createElement('li');
             li.className = 'list-item';
             
@@ -338,10 +348,11 @@
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             li.innerHTML = `
-                <div>
+                <div style="overflow: hidden;">
                     <div class="item-code">${displayText}</div>
                     <div class="item-time">${timeString}</div>
-                </div>                <div style="color: var(--success);">✓</div>
+                </div>
+                <div style="color: var(--success); flex-shrink: 0; margin-left: 10px;">✓</div>
             `;
             
             // Добавляем в начало списка
@@ -351,7 +362,7 @@
         function showToast(message) {
             toast.textContent = message;
             toast.className = "show";
-            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2000);
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 2500);
         }
 
         // --- Экспорт в Excel ---
