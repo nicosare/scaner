@@ -1,115 +1,109 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Сканер акцизов</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Сканер акцизов</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(180deg, #0f0f0f, #1a1a1a);
-      color: #fff;
-      text-align: center;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #0f0f0f;
+  color: white;
+  text-align: center;
+}
 
-    h3 {
-      margin: 10px 0;
-      font-weight: 500;
-    }
+/* Камера меньше */
+#video {
+  width: 75vw;
+  height: 75vw;
+  max-width: 320px;
+  max-height: 320px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 3px solid #444;
+}
 
-    #container {
-      position: relative;
-      display: inline-block;
-    }
+/* Контейнер */
+#container {
+  position: relative;
+  margin-top: 10px;
+}
 
-    #video {
-      width: 92vw;
-      height: 92vw;
-      max-width: 420px;
-      max-height: 420px;
-      border-radius: 16px;
-      object-fit: cover;
-      border: 3px solid #444;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    }
+/* Рамка */
+#overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 65%;
+  height: 65%;
+  transform: translate(-50%, -50%);
+  border: 3px solid #888;
+  border-radius: 14px;
+  transition: all 0.2s;
+}
 
-    /* Центральная рамка */
-    #overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 65%;
-      height: 65%;
-      transform: translate(-50%, -50%);
-      border: 3px solid #888;
-      border-radius: 14px;
-      transition: all 0.2s ease;
-      pointer-events: none;
-    }
+/* Яркая индикация */
+.flash-success {
+  border-color: #00ff88 !important;
+  box-shadow: 0 0 25px #00ff88;
+  background: rgba(0,255,120,0.15);
+}
 
-    .success {
-      border-color: #4CAF50 !important;
-      box-shadow: 0 0 20px #4CAF50;
-    }
+.flash-error {
+  border-color: #ff3b3b !important;
+  box-shadow: 0 0 25px #ff3b3b;
+  background: rgba(255,0,0,0.15);
+}
 
-    .error {
-      border-color: #f44336 !important;
-      box-shadow: 0 0 20px #f44336;
-    }
+#counter {
+  font-size: 20px;
+  margin: 8px;
+}
 
-    #counter {
-      margin-top: 8px;
-      font-size: 20px;
-      font-weight: bold;
-    }
+button {
+  margin: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  background: #4CAF50;
+  color: white;
+}
 
-    button {
-      margin: 12px;
-      padding: 12px 20px;
-      font-size: 15px;
-      border: none;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #4CAF50, #2e7d32);
-      color: white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
+#list {
+  padding: 10px;
+}
 
-    #list {
-      padding: 10px;
-    }
+.card {
+  background: #1c1c1c;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  text-align: left;
+}
 
-    .card {
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 10px;
-      text-align: left;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    }
+.code {
+  font-size: 13px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
 
-    .code {
-      font-size: 13px;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-
-    .time {
-      font-size: 11px;
-      color: #aaa;
-      margin-top: 6px;
-    }
-  </style>
+.time {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 5px;
+}
+</style>
 </head>
+
 <body>
 
-<h3>Сканер акцизных марок</h3>
+<h3>Сканер акцизов</h3>
 
 <div id="container">
   <video id="video" autoplay muted playsinline></video>
@@ -118,108 +112,144 @@
 
 <div id="counter">0</div>
 
-<button onclick="exportExcel()">Экспорт в Excel</button>
+<div>
+  <button onclick="toggleTorch()">🔦 Фонарик</button>
+  <button onclick="exportExcel()">Экспорт</button>
+</div>
 
 <div id="list"></div>
 
 <script>
-  const video = document.getElementById('video');
-  const list = document.getElementById('list');
-  const counter = document.getElementById('counter');
-  const overlay = document.getElementById('overlay');
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const list = document.getElementById('list');
+const counter = document.getElementById('counter');
 
-  const scannedSet = new Set();
+const scannedSet = new Set();
 
-  let lastScan = "";
-  let lastScanTime = 0;
+let track;
+let torchOn = false;
+let lastScan = "";
+let lastTime = 0;
 
-  function updateCounter() {
-    counter.textContent = scannedSet.size;
+/* ВИБРАЦИЯ (максимально совместимая) */
+function vibrateSuccess() {
+  if (navigator.vibrate) {
+    navigator.vibrate([300, 100, 300]);
   }
+}
 
-  function flash(type) {
-    overlay.classList.remove('success', 'error');
-    overlay.classList.add(type);
-
-    setTimeout(() => {
-      overlay.classList.remove(type);
-    }, 300);
+function vibrateError() {
+  if (navigator.vibrate) {
+    navigator.vibrate([80, 80, 80, 80]);
   }
+}
 
-  function getTime() {
-    return new Date().toLocaleString();
-  }
+/* ВСПЫШКА */
+function flash(type) {
+  overlay.classList.remove('flash-success','flash-error');
+  overlay.classList.add(type);
 
-  async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
+  setTimeout(()=>{
+    overlay.classList.remove(type);
+  }, 400);
+}
+
+function updateCounter() {
+  counter.textContent = scannedSet.size;
+}
+
+function getTime() {
+  return new Date().toLocaleString();
+}
+
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
+
+  video.srcObject = stream;
+  track = stream.getVideoTracks()[0];
+
+  const cap = track.getCapabilities();
+
+  if (cap.zoom) {
+    track.applyConstraints({
+      advanced: [{ zoom: Math.min(cap.zoom.max, 2.5) }]
     });
+  }
+}
 
-    video.srcObject = stream;
+/* ФОНАРИК */
+async function toggleTorch() {
+  if (!track) return;
 
-    const track = stream.getVideoTracks()[0];
-    const cap = track.getCapabilities();
+  const cap = track.getCapabilities();
 
-    if (cap.zoom) {
-      track.applyConstraints({
-        advanced: [{ zoom: Math.min(cap.zoom.max, 2.5) }]
-      });
+  if (!cap.torch) {
+    alert("Фонарик не поддерживается");
+    return;
+  }
+
+  torchOn = !torchOn;
+
+  await track.applyConstraints({
+    advanced: [{ torch: torchOn }]
+  });
+}
+
+/* СКАНЕР */
+async function startScanner() {
+  const reader = new ZXing.BrowserMultiFormatReader();
+
+  reader.decodeFromVideoDevice(null, video, (result) => {
+    if (!result) return;
+
+    const text = result.text;
+    const now = Date.now();
+
+    if (text === lastScan && now - lastTime < 1200) return;
+
+    lastScan = text;
+    lastTime = now;
+
+    if (!scannedSet.has(text)) {
+      scannedSet.add(text);
+
+      vibrateSuccess();
+      flash('flash-success');
+
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      card.innerHTML = `
+        <div class="code">${text}</div>
+        <div class="time">${getTime()}</div>
+      `;
+
+      list.prepend(card);
+
+      updateCounter();
+
+    } else {
+      vibrateError();
+      flash('flash-error');
     }
-  }
+  });
+}
 
-  async function startScanner() {
-    const reader = new ZXing.BrowserMultiFormatReader();
+/* ЭКСПОРТ */
+function exportExcel() {
+  const data = Array.from(scannedSet).map(x => [x]);
 
-    reader.decodeFromVideoDevice(null, video, (result) => {
-      if (!result) return;
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
 
-      const text = result.text;
-      const now = Date.now();
+  XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
+  XLSX.writeFile(wb, "excise_codes.xlsx");
+}
 
-      // анти-дребезг (чтобы не ловить один код много раз подряд)
-      if (text === lastScan && now - lastScanTime < 1200) return;
-
-      lastScan = text;
-      lastScanTime = now;
-
-      if (!scannedSet.has(text)) {
-        scannedSet.add(text);
-
-        // сильная вибрация
-        if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
-
-        const card = document.createElement('div');
-        card.className = 'card';
-
-        card.innerHTML = `
-          <div class="code">${text}</div>
-          <div class="time">${getTime()}</div>
-        `;
-
-        list.prepend(card);
-
-        updateCounter();
-        flash('success');
-
-      } else {
-        if (navigator.vibrate) navigator.vibrate([60, 60, 60, 60]);
-        flash('error');
-      }
-    });
-  }
-
-  function exportExcel() {
-    const data = Array.from(scannedSet).map(x => [x]);
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(wb, ws, "Акцизы");
-
-    XLSX.writeFile(wb, "excise_codes.xlsx");
-  }
-
-  startCamera().then(startScanner);
+startCamera().then(startScanner);
 </script>
 
 </body>
