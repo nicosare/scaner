@@ -11,10 +11,15 @@
   <style>
     body {
       margin: 0;
-      font-family: sans-serif;
-      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(180deg, #0f0f0f, #1a1a1a);
       color: #fff;
       text-align: center;
+    }
+
+    h3 {
+      margin: 10px 0;
+      font-weight: 500;
     }
 
     #container {
@@ -23,57 +28,55 @@
     }
 
     #video {
-      width: 90vw;
-      height: 90vw;
-      max-width: 400px;
-      max-height: 400px;
-      margin-top: 10px;
-      border-radius: 12px;
+      width: 92vw;
+      height: 92vw;
+      max-width: 420px;
+      max-height: 420px;
+      border-radius: 16px;
       object-fit: cover;
-      border: 2px solid #444;
+      border: 3px solid #444;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     }
 
-    /* Рамка прицела */
+    /* Центральная рамка */
     #overlay {
       position: absolute;
-      top: 10px;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      width: 70%;
-      height: 70%;
-      border: 3px solid rgba(255,255,255,0.6);
-      border-radius: 10px;
+      width: 65%;
+      height: 65%;
+      transform: translate(-50%, -50%);
+      border: 3px solid #888;
+      border-radius: 14px;
+      transition: all 0.2s ease;
       pointer-events: none;
+    }
+
+    .success {
+      border-color: #4CAF50 !important;
+      box-shadow: 0 0 20px #4CAF50;
+    }
+
+    .error {
+      border-color: #f44336 !important;
+      box-shadow: 0 0 20px #f44336;
     }
 
     #counter {
       margin-top: 8px;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
     }
 
-    #status {
-      height: 20px;
-      margin-top: 5px;
-      font-size: 14px;
-    }
-
-    .success {
-      color: #4CAF50;
-    }
-
-    .duplicate {
-      color: #f44336;
-    }
-
     button {
-      margin: 10px;
+      margin: 12px;
       padding: 12px 20px;
-      font-size: 16px;
+      font-size: 15px;
       border: none;
-      border-radius: 10px;
-      background: #4CAF50;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #4CAF50, #2e7d32);
       color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
 
     #list {
@@ -81,19 +84,26 @@
     }
 
     .card {
-      background: #1e1e1e;
-      border-radius: 12px;
-      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 14px;
+      padding: 12px;
       margin-bottom: 10px;
-      font-size: 12px;
       text-align: left;
-      border: 1px solid #333;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    .code {
+      font-size: 13px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
     .time {
       font-size: 11px;
       color: #aaa;
-      margin-top: 5px;
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -107,11 +117,8 @@
 </div>
 
 <div id="counter">0</div>
-<div id="status"></div>
 
-<div>
-  <button onclick="exportExcel()">Экспорт в Excel</button>
-</div>
+<button onclick="exportExcel()">Экспорт в Excel</button>
 
 <div id="list"></div>
 
@@ -119,27 +126,28 @@
   const video = document.getElementById('video');
   const list = document.getElementById('list');
   const counter = document.getElementById('counter');
-  const status = document.getElementById('status');
+  const overlay = document.getElementById('overlay');
 
   const scannedSet = new Set();
+
+  let lastScan = "";
+  let lastScanTime = 0;
 
   function updateCounter() {
     counter.textContent = scannedSet.size;
   }
 
-  function showStatus(text, type) {
-    status.textContent = text;
-    status.className = type;
+  function flash(type) {
+    overlay.classList.remove('success', 'error');
+    overlay.classList.add(type);
 
     setTimeout(() => {
-      status.textContent = '';
-      status.className = '';
-    }, 1000);
+      overlay.classList.remove(type);
+    }, 300);
   }
 
-  function getCurrentTime() {
-    const now = new Date();
-    return now.toLocaleString();
+  function getTime() {
+    return new Date().toLocaleString();
   }
 
   async function startCamera() {
@@ -150,51 +158,58 @@
     video.srcObject = stream;
 
     const track = stream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities();
+    const cap = track.getCapabilities();
 
-    if (capabilities.zoom) {
+    if (cap.zoom) {
       track.applyConstraints({
-        advanced: [{ zoom: Math.min(capabilities.zoom.max, 2.5) }]
+        advanced: [{ zoom: Math.min(cap.zoom.max, 2.5) }]
       });
     }
   }
 
   async function startScanner() {
-    const codeReader = new ZXing.BrowserMultiFormatReader();
+    const reader = new ZXing.BrowserMultiFormatReader();
 
-    codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-      if (result) {
-        const text = result.text;
+    reader.decodeFromVideoDevice(null, video, (result) => {
+      if (!result) return;
 
-        if (!scannedSet.has(text)) {
-          scannedSet.add(text);
+      const text = result.text;
+      const now = Date.now();
 
-          if (navigator.vibrate) navigator.vibrate(100);
+      // анти-дребезг (чтобы не ловить один код много раз подряд)
+      if (text === lastScan && now - lastScanTime < 1200) return;
 
-          const card = document.createElement('div');
-          card.className = 'card';
+      lastScan = text;
+      lastScanTime = now;
 
-          card.innerHTML = `
-            <div>${text}</div>
-            <div class="time">${getCurrentTime()}</div>
-          `;
+      if (!scannedSet.has(text)) {
+        scannedSet.add(text);
 
-          // добавляем В НАЧАЛО
-          list.prepend(card);
+        // сильная вибрация
+        if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
 
-          updateCounter();
-          showStatus('Сканировано', 'success');
+        const card = document.createElement('div');
+        card.className = 'card';
 
-        } else {
-          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-          showStatus('Дубликат', 'duplicate');
-        }
+        card.innerHTML = `
+          <div class="code">${text}</div>
+          <div class="time">${getTime()}</div>
+        `;
+
+        list.prepend(card);
+
+        updateCounter();
+        flash('success');
+
+      } else {
+        if (navigator.vibrate) navigator.vibrate([60, 60, 60, 60]);
+        flash('error');
       }
     });
   }
 
   function exportExcel() {
-    const data = Array.from(scannedSet).map(code => [code]);
+    const data = Array.from(scannedSet).map(x => [x]);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
