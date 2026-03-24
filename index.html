@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Сканер акцизных марок и Честного знака</title>
-    <!-- Подключение ZXing для распознавания штрихкодов (Data Matrix, QR, EAN и др.) -->
+    <title>Акцизный сканер</title>
     <script src="https://unpkg.com/@zxing/library@0.19.0/umd/index.js"></script>
     <style>
         * {
@@ -22,13 +21,11 @@
             min-height: 100vh;
         }
 
-        /* Контейнер для всего приложения */
         .app-container {
             max-width: 600px;
             margin: 0 auto;
         }
 
-        /* Заголовок */
         .header {
             margin-bottom: 24px;
             text-align: center;
@@ -50,14 +47,12 @@
             margin-top: 6px;
         }
 
-        /* Панель управления камерой */
         .camera-panel {
             background: white;
             border-radius: 28px;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
             margin-bottom: 24px;
             overflow: hidden;
-            transition: all 0.2s ease;
         }
 
         .video-wrapper {
@@ -114,7 +109,6 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            backdrop-filter: blur(4px);
             flex: 1 0 auto;
             justify-content: center;
         }
@@ -150,7 +144,6 @@
             background: #0a2c21;
         }
 
-        /* Список отсканированных кодов */
         .list-section {
             background: white;
             border-radius: 28px;
@@ -237,7 +230,6 @@
             font-size: 0.9rem;
         }
 
-        /* уведомления */
         .toast-msg {
             position: fixed;
             bottom: 24px;
@@ -253,19 +245,17 @@
             transition: opacity 0.2s;
             pointer-events: none;
             z-index: 1000;
-            white-space: nowrap;
-            max-width: 90vw;
             white-space: normal;
             text-align: center;
             backdrop-filter: blur(8px);
             background: rgba(0,0,0,0.8);
+            max-width: 90vw;
         }
 
         .toast-msg.show {
             opacity: 1;
         }
 
-        /* вспомогательные */
         .hidden {
             display: none !important;
         }
@@ -310,8 +300,8 @@
 <div id="toastMessage" class="toast-msg"></div>
 
 <script>
-    // --- DOM элементы ---
-    const videoElement = document.getElementById('videoElement');
+    // DOM элементы
+    const video = document.getElementById('videoElement');
     const overlayCanvas = document.getElementById('canvasOverlay');
     const ctx = overlayCanvas.getContext('2d');
     const startBtn = document.getElementById('startCameraBtn');
@@ -319,33 +309,24 @@
     const scansListEl = document.getElementById('scansList');
     const countBadge = document.getElementById('countBadge');
     const exportBtn = document.getElementById('exportExcelBtn');
-    const toast = document.getElementById('toastMessage');
+    const toastDiv = document.getElementById('toastMessage');
 
-    // --- Состояние приложения ---
-    let scannedCodes = [];          // массив объектов { text, timestamp }
-    let currentReader = null;       // экземпляр ZXing BrowserMultiFormatReader
-    let currentStream = null;       // MediaStream для остановки
-    let isScanning = false;
-    let frameTimer = null;           // таймер для очистки рамки
-    let lastBoxPoints = null;        // последние точки для рамки
+    // Состояние
+    let scannedCodes = [];
+    let currentReader = null;
+    let currentStream = null;
+    let isScanningActive = false;
+    let frameTimer = null;
 
-    // --- Вспомогательные функции ---
-    function showToast(message, duration = 1800) {
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, duration);
+    // Утилиты
+    function showToast(msg, duration = 2000) {
+        toastDiv.textContent = msg;
+        toastDiv.classList.add('show');
+        setTimeout(() => toastDiv.classList.remove('show'), duration);
     }
 
-    // Обновление списка в UI
-    function updateScansList() {
-        if (!scansListEl) return;
-        // очищаем список, кроме возможного пустого сообщения
-        while (scansListEl.firstChild) {
-            scansListEl.removeChild(scansListEl.firstChild);
-        }
-
+    function updateList() {
+        scansListEl.innerHTML = '';
         if (scannedCodes.length === 0) {
             const emptyLi = document.createElement('li');
             emptyLi.className = 'empty-state';
@@ -354,10 +335,9 @@
             countBadge.innerText = '0';
             return;
         }
-
         countBadge.innerText = scannedCodes.length;
-        // выводим в обратном порядке (новые сверху)
-        [...scannedCodes].reverse().forEach((item, idx) => {
+        // Новые сверху
+        [...scannedCodes].reverse().forEach((item) => {
             const li = document.createElement('li');
             li.className = 'scan-item';
             const span = document.createElement('span');
@@ -366,292 +346,206 @@
             const delBtn = document.createElement('button');
             delBtn.innerText = '🗑️';
             delBtn.className = 'delete-btn';
-            delBtn.setAttribute('aria-label', 'Удалить');
-            // находим реальный индекс в исходном массиве для удаления
-            const originalIndex = scannedCodes.findIndex(c => c.text === item.text && c.timestamp === item.timestamp);
-            delBtn.addEventListener('click', (e) => {
+            delBtn.onclick = (e) => {
                 e.stopPropagation();
-                if (originalIndex !== -1) {
-                    scannedCodes.splice(originalIndex, 1);
-                    updateScansList();
+                const idx = scannedCodes.findIndex(c => c.text === item.text && c.timestamp === item.timestamp);
+                if (idx !== -1) {
+                    scannedCodes.splice(idx, 1);
+                    updateList();
                     showToast('Код удалён');
                 }
-            });
+            };
             li.appendChild(span);
             li.appendChild(delBtn);
             scansListEl.appendChild(li);
         });
     }
 
-    // Добавление нового кода в список (без дубликатов)
-    function addScannedCode(codeText) {
-        if (!codeText || codeText.trim() === '') return false;
-        const normalized = codeText.trim();
-        // проверка на существование
-        const alreadyExists = scannedCodes.some(item => item.text === normalized);
-        if (alreadyExists) {
-            // код уже есть в списке, не добавляем повторно, но рамка будет показана
-            return false;
-        }
-        scannedCodes.unshift({ text: normalized, timestamp: Date.now() }); // добавляем в начало (новые сверху)
-        updateScansList();
-        showToast(`✅ Новый код: ${normalized.length > 24 ? normalized.slice(0, 22) + '…' : normalized}`);
-        // вибрация если поддерживается (мобильное приятное дополнение)
-        if (window.navigator && window.navigator.vibrate) {
-            window.navigator.vibrate(80);
-        }
+    function addCode(text) {
+        if (!text || text.trim() === '') return false;
+        const normalized = text.trim();
+        if (scannedCodes.some(c => c.text === normalized)) return false;
+        scannedCodes.unshift({ text: normalized, timestamp: Date.now() });
+        updateList();
+        showToast(`✅ ${normalized.length > 28 ? normalized.slice(0, 26) + '…' : normalized}`);
+        if (window.navigator && window.navigator.vibrate) navigator.vibrate(80);
         return true;
     }
 
-    // --- Рисование зелёной рамки по точкам от ZXing ---
-    function drawBoundingBox(points) {
+    // Рисование рамки
+    function drawBox(points) {
         if (!ctx || !overlayCanvas) return;
-        // синхронизация размера canvas с видео
-        const videoRect = videoElement.getBoundingClientRect();
-        const wrapperRect = overlayCanvas.parentElement.getBoundingClientRect();
-        overlayCanvas.width = wrapperRect.width;
-        overlayCanvas.height = wrapperRect.height;
+        const rect = overlayCanvas.parentElement.getBoundingClientRect();
+        overlayCanvas.width = rect.width;
+        overlayCanvas.height = rect.height;
         ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         if (!points || points.length < 3) return;
 
-        // получаем реальные размеры видео элемента (внутренние пропорции)
-        const videoWidth = videoElement.videoWidth;
-        const videoHeight = videoElement.videoHeight;
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
         if (videoWidth === 0 || videoHeight === 0) return;
 
-        // коэффициенты масштабирования от видео-пикселей к canvas-пикселям
         const scaleX = overlayCanvas.width / videoWidth;
         const scaleY = overlayCanvas.height / videoHeight;
 
         ctx.beginPath();
         ctx.strokeStyle = '#22c55e';
         ctx.lineWidth = 4;
-        ctx.shadowBlur = 0;
-        // рисуем полилинию, соединяя точки
         const first = points[0];
-        let moveX = first.x * scaleX;
-        let moveY = first.y * scaleY;
-        ctx.moveTo(moveX, moveY);
+        ctx.moveTo(first.x * scaleX, first.y * scaleY);
         for (let i = 1; i < points.length; i++) {
-            const p = points[i];
-            ctx.lineTo(p.x * scaleX, p.y * scaleY);
+            ctx.lineTo(points[i].x * scaleX, points[i].y * scaleY);
         }
-        // замыкаем если минимум 3 точки
-        if (points.length > 2) {
-            ctx.closePath();
-        }
+        ctx.closePath();
         ctx.stroke();
-        // добавим легкую внутреннюю подсветку
-        ctx.save();
-        ctx.globalAlpha = 0.2;
         ctx.fillStyle = '#22c55e';
+        ctx.globalAlpha = 0.2;
         ctx.fill();
-        ctx.restore();
-    }
+        ctx.globalAlpha = 1;
 
-    // сброс рамки (очистка canvas)
-    function clearOverlay() {
-        if (ctx && overlayCanvas) {
-            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        }
-        lastBoxPoints = null;
-    }
-
-    // установить таймер для автоматической очистки рамки через 800 мс
-    function resetFrameTimer() {
         if (frameTimer) clearTimeout(frameTimer);
         frameTimer = setTimeout(() => {
-            clearOverlay();
-        }, 700);
+            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }, 600);
     }
 
-    // --- Обработка успешного декодирования ---
-    function onCodeDecode(result) {
-        if (!isScanning) return;
-        if (!result) return;
-        const codeText = result.getText ? result.getText() : (result.text || '');
-        if (!codeText) return;
-
-        // Получаем точки для отрисовки рамки (ZXing возвращает ResultPoint[])
-        let points = null;
-        if (result.getResultPoints && typeof result.getResultPoints === 'function') {
-            points = result.getResultPoints();
-        } else if (result.points) {
-            points = result.points;
-        }
-        if (points && points.length) {
-            drawBoundingBox(points);
-            resetFrameTimer();
-        } else {
-            // если нет точек, но есть текст — всё равно сбросим предыдущую рамку и покажем кратковременный визуальный фидбек
-            clearOverlay();
-            // быстро нарисуем мигающий зелёный уголок? но достаточно просто добавим через toast
-        }
-        // Добавляем код в историю (если новый)
-        addScannedCode(codeText);
+    function clearOverlay() {
+        if (ctx && overlayCanvas) ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        if (frameTimer) clearTimeout(frameTimer);
     }
 
-    // --- Запуск камеры и инициализация сканера через ZXing ---
+    // Остановка всего
+    async function stopCamera() {
+        if (!isScanningActive && !currentStream && !currentReader) return;
+        isScanningActive = false;
+
+        if (currentReader) {
+            try {
+                await currentReader.reset();
+            } catch(e) { console.warn(e); }
+            currentReader = null;
+        }
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        video.srcObject = null;
+        video.pause();
+        clearOverlay();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        showToast('Камера остановлена');
+    }
+
+    // Запуск
     async function startCamera() {
-        if (isScanning) {
+        if (isScanningActive) {
             showToast('Камера уже работает');
             return;
         }
 
         try {
-            // запрос доступа к камере (получим поток, чтобы потом остановить)
+            // 1. Запрашиваем доступ
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             currentStream = stream;
-            videoElement.srcObject = stream;
-            await videoElement.play();
+            video.srcObject = stream;
+            await video.play();
 
-            // убедимся что видео отобразилось, подстроим canvas
+            // Ждём метаданных
             await new Promise((resolve) => {
-                if (videoElement.videoWidth > 0) resolve();
-                else videoElement.onloadedmetadata = () => resolve();
+                if (video.videoWidth > 0) resolve();
+                else video.onloadedmetadata = () => resolve();
             });
 
-            // Синхронизация canvas
-            const wrapper = overlayCanvas.parentElement;
-            const rect = wrapper.getBoundingClientRect();
-            overlayCanvas.width = rect.width;
-            overlayCanvas.height = rect.height;
-
-            // Инициализация ZXing MultiFormatReader
+            // 2. Инициализируем сканер
             const { BrowserMultiFormatReader } = ZXing;
             const reader = new BrowserMultiFormatReader();
             currentReader = reader;
 
-            // Запуск непрерывного сканирования из video элемента (автоматическое распознавание)
-            // Используем decodeFromVideoElement, который вызывает callback при каждом успешном декодировании
-            // Важно: видео элемент уже имеет поток, и reader будет использовать его.
-            // Но decodeFromVideoElement запрашивает поток повторно? Лучше передать уже существующий videoElement, reader использует его без повторного запроса.
-            await reader.decodeFromVideoElement(videoElement, (result, err) => {
-                if (!isScanning) return;
+            // Устанавливаем флаг, что сканирование активно
+            isScanningActive = true;
+
+            // Запускаем непрерывное сканирование без await (чтобы не блокировать)
+            reader.decodeFromVideoElement(video, (result, err) => {
+                if (!isScanningActive) return;
                 if (result) {
-                    onCodeDecode(result);
+                    const text = result.getText();
+                    // Рамка
+                    const points = result.getResultPoints();
+                    if (points && points.length) drawBox(points);
+                    addCode(text);
                 }
-                // ошибки игнорируем, если это не критические (например, если кадр не содержит кода - норма)
+                // Игнорируем ошибки "не найден код"
                 if (err && err.name !== 'NotFoundException' && err.name !== 'ChecksumException') {
                     console.warn('ZXing error:', err);
                 }
+            }).catch(e => {
+                console.error('ZXing decode error:', e);
+                if (isScanningActive) {
+                    showToast('Ошибка сканера. Перезапустите камеру.', 2500);
+                    stopCamera();
+                }
             });
 
-            isScanning = true;
             startBtn.disabled = true;
             stopBtn.disabled = false;
-            showToast('Камера активна. Наведите на акцизную марку / Data Matrix', 2500);
-            // Убираем старую рамку
+            showToast('Камера готова. Наведите на акцизную марку.', 2000);
             clearOverlay();
+
         } catch (error) {
-            console.error('Camera error:', error);
-            let errorMsg = 'Не удалось получить доступ к камере. ';
-            if (error.name === 'NotAllowedError') errorMsg += 'Разрешение отклонено.';
-            else if (error.name === 'NotFoundError') errorMsg += 'Камера не найдена.';
-            else errorMsg += 'Проверьте права и HTTPS.';
-            showToast(errorMsg, 3000);
+            console.error('Camera start error:', error);
+            let msg = 'Не удалось получить доступ к камере. ';
+            if (error.name === 'NotAllowedError') msg += 'Разрешение отклонено. Проверьте настройки сайта.';
+            else if (error.name === 'NotFoundError') msg += 'Камера не найдена.';
+            else if (error.name === 'NotReadableError') msg += 'Камера занята другим приложением.';
+            else msg += 'Убедитесь, что сайт открыт по HTTPS и разрешён доступ.';
+            showToast(msg, 4000);
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            isScanning = false;
             if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
+                currentStream.getTracks().forEach(t => t.stop());
                 currentStream = null;
             }
+            isScanningActive = false;
         }
     }
 
-    // --- Остановка камеры и освобождение ресурсов ---
-    async function stopCamera() {
-        if (!isScanning && !currentReader && !currentStream) {
-            showToast('Камера не активна');
-            return;
-        }
-        try {
-            if (currentReader && currentReader.reset) {
-                await currentReader.reset();
-            }
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => {
-                    track.stop();
-                });
-                currentStream = null;
-            }
-            videoElement.srcObject = null;
-            videoElement.pause();
-            isScanning = false;
-            currentReader = null;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            clearOverlay();
-            if (frameTimer) clearTimeout(frameTimer);
-            showToast('Камера остановлена');
-        } catch (e) {
-            console.warn('stop error', e);
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            isScanning = false;
-        }
-    }
-
-    // --- Экспорт в Excel (CSV с разделителями, но с расширением .xls) ---
-    function exportToExcel() {
+    // Экспорт в Excel (простой текстовый файл .xls)
+    function exportExcel() {
         if (scannedCodes.length === 0) {
-            showToast('Нет данных для экспорта. Сначала отсканируйте коды.', 2000);
+            showToast('Нет данных для экспорта', 1500);
             return;
         }
-        // формируем содержимое: каждая акциза с новой строки, без заголовков, как просили "каждая акциза с новой строки"
-        // дополнительно можно добавить простой заголовок, но согласно заданию: просто список акциз
-        let content = "";
-        scannedCodes.forEach(item => {
-            content += item.text + "\n";
-        });
-        // создаём Blob с типом для Excel (application/vnd.ms-excel)
-        const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8;" });
+        let content = scannedCodes.map(item => item.text).join('\n');
+        const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
-        const now = new Date();
-        const filename = `акцизы_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}_${now.getHours()}-${now.getMinutes()}.xls`;
+        const date = new Date();
+        const filename = `акцизы_${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}.xls`;
         link.href = url;
-        link.setAttribute('download', filename);
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        showToast(`Экспортировано ${scannedCodes.length} кодов`, 1800);
+        showToast(`Экспортировано ${scannedCodes.length} кодов`);
     }
 
-    // --- Обработка изменения размера экрана (для корректной отрисовки рамки) ---
-    function resizeCanvas() {
-        if (!isScanning) return;
-        const wrapper = overlayCanvas.parentElement;
-        if (wrapper) {
-            const rect = wrapper.getBoundingClientRect();
+    // События
+    startBtn.addEventListener('click', startCamera);
+    stopBtn.addEventListener('click', stopCamera);
+    exportBtn.addEventListener('click', exportExcel);
+
+    // Адаптация canvas при изменении размера
+    window.addEventListener('resize', () => {
+        if (isScanningActive && overlayCanvas) {
+            const rect = overlayCanvas.parentElement.getBoundingClientRect();
             overlayCanvas.width = rect.width;
             overlayCanvas.height = rect.height;
-            // если последняя рамка была, перерисуем? Можно, но проще дождаться следующего сканирования
         }
-    }
+    });
 
-    // --- Инициализация, обработчики событий ---
-    function init() {
-        startBtn.addEventListener('click', startCamera);
-        stopBtn.addEventListener('click', stopCamera);
-        exportBtn.addEventListener('click', exportToExcel);
-        window.addEventListener('resize', () => {
-            resizeCanvas();
-            if (lastBoxPoints) drawBoundingBox(lastBoxPoints);
-        });
-        // если вкладка скрыта – не обновляем рамку агрессивно, но всё ок
-        // принудительная остановка при закрытии страницы
-        window.addEventListener('beforeunload', () => {
-            if (currentStream) {
-                currentStream.getTracks().forEach(t => t.stop());
-            }
-        });
-        updateScansList();
-    }
-
-    init();
+    updateList();
 </script>
 </body>
 </html>
