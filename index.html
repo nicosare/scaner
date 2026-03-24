@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Сканер Акцизов</title>
     
-    <!-- ZXing - легкий и быстрый сканер -->
     <script src="https://unpkg.com/@zxing/library@latest" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -20,14 +19,12 @@
             --error: #ef4444;
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             color: var(--text);
-            margin: 0;
-            padding: 0;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
@@ -47,7 +44,8 @@
             font-size: 14px;
             color: var(--text-sec);
             margin-bottom: 12px;
-            font-weight: 500;            text-align: center;
+            font-weight: 500;
+            text-align: center;
         }
 
         #scanner-container {
@@ -67,6 +65,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            display: block;
+            background: #111;
         }
 
         .scan-status {
@@ -96,7 +96,8 @@
             width: 44px;
             height: 44px;
             border-radius: 50%;
-            display: none;            align-items: center;
+            display: none;
+            align-items: center;
             justify-content: center;
             cursor: pointer;
             backdrop-filter: blur(8px);
@@ -106,6 +107,35 @@
         .torch-btn.active {
             background: rgba(255, 200, 0, 0.9);
             border-color: #fff;
+        }
+
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 40;
+            display: none;
+            max-width: 90%;
+        }
+
+        .loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 40;
         }
 
         main {
@@ -145,7 +175,8 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.06);
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;            animation: slideIn 0.3s ease;
+            align-items: flex-start;
+            animation: slideIn 0.3s ease;
         }
 
         .item-code {
@@ -194,7 +225,8 @@
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             background-color: var(--surface);
-            color: var(--text);            display: flex;
+            color: var(--text);
+            display: flex;
             align-items: center;
             gap: 10px;
         }
@@ -241,9 +273,12 @@
         <div class="scanner-title">Наведите камеру на код</div>
         <div id="scanner-container">
             <video id="video" playsinline autoplay muted></video>
+            <div id="loading-msg" class="loading-message">Запуск камеры...</div>
+            <div id="error-msg" class="error-message"></div>
             <button class="torch-btn" id="torch-btn" onclick="toggleTorch()">
                 <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>                </svg>
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                </svg>
             </button>
             <div id="scan-status-msg" class="scan-status"></div>
         </div>
@@ -286,62 +321,113 @@
         const emptyMsg = document.getElementById('empty-msg');
         const countBadge = document.getElementById('total-count');
         const toast = document.getElementById('toast');
+        const loadingMsg = document.getElementById('loading-msg');
+        const errorMsg = document.getElementById('error-msg');
 
-        // Инициализация при загрузке страницы
         window.addEventListener('load', () => {
-            initScanner();
+            setTimeout(initScanner, 100);
         });
 
-        async function initScanner() {            // Инициализируем ZXing с поддержкой DataMatrix и QR
-            codeReader = new ZXing.BrowserMultiFormatReader(
-                { 
-                    hints: new Map([
-                        [ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                            ZXing.BarcodeFormat.DATA_MATRIX,
-                            ZXing.BarcodeFormat.QR_CODE,
-                            ZXing.BarcodeFormat.AZTEC,
-                            ZXing.BarcodeFormat.PDF_417
-                        ]],
-                        [ZXing.DecodeHintType.TRY_HARDER, true],
-                        [ZXing.DecodeHintType.CHARACTER_SET, 'UTF-8']
-                    ])
-                },
-                null
-            );
-
+        async function initScanner() {
             try {
-                // Запускаем камеру
-                const stream = await navigator.mediaDevices.getUserMedia({
+                loadingMsg.style.display = 'block';
+                errorMsg.style.display = 'none';
+
+                // Проверяем HTTPS
+                if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                    throw new Error('Камера работает только по HTTPS');
+                }
+
+                // Проверяем поддержку камеры
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Камера не поддерживается браузером');
+                }
+
+                // Запрашиваем камеру
+                const constraints = {
                     video: {
                         facingMode: { exact: "environment" },
                         width: { ideal: 1920 },
                         height: { ideal: 1080 }
                     },
                     audio: false
-                });
+                };
 
-                video.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
-                await new Promise((resolve) => {
+                // Проверяем stream
+                if (!stream || !stream.getVideoTracks().length) {
+                    throw new Error('Не удалось получить видеопоток');
+                }
+
+                videoTrack = stream.getVideoTracks()[0];
+                video.srcObject = stream;
+                
+                // Ждем загрузки видео
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Таймаут загрузки камеры'));
+                    }, 10000);
+
                     video.onloadedmetadata = () => {
-                        video.play();
-                        torchBtn.style.display = 'flex';
-                        resolve();
+                        clearTimeout(timeout);
+                        video.play().then(() => {
+                            resolve();
+                        }).catch(err => {
+                            reject(new Error('Ошибка воспроизведения: ' + err.message));
+                        });
+                    };
+
+                    video.onerror = () => {
+                        clearTimeout(timeout);
+                        reject(new Error('Ошибка видео элемента'));
                     };
                 });
 
+                // Скрываем загрузку, показываем камеру
+                loadingMsg.style.display = 'none';
+                torchBtn.style.display = 'flex';
+                
                 // Применяем зум
-                setTimeout(applyZoom, 500);
+                setTimeout(applyZoom, 1000);
+                
+                // Инициализируем сканер
+                initZXing();
+                
+            } catch (err) {
+                console.error("Ошибка инициализации:", err);
+                loadingMsg.style.display = 'none';
+                errorMsg.style.display = 'block';
+                errorMsg.textContent = 'Ошибка камеры: ' + err.message + '\n\nУбедитесь:\n• Сайт открыт по HTTPS\n• Даны разрешения на камеру\n• Камера не используется другими приложениями';
+            }
+        }
+
+        function initZXing() {
+            try {
+                codeReader = new ZXing.BrowserMultiFormatReader(
+                    { 
+                        hints: new Map([
+                            [ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                                ZXing.BarcodeFormat.DATA_MATRIX,
+                                ZXing.BarcodeFormat.QR_CODE,
+                                ZXing.BarcodeFormat.AZTEC,
+                                ZXing.BarcodeFormat.PDF_417
+                            ]],
+                            [ZXing.DecodeHintType.TRY_HARDER, true],
+                            [ZXing.DecodeHintType.CHARACTER_SET, 'UTF-8']
+                        ])
+                    },
+                    null
+                );
                 
                 // Запускаем непрерывное сканирование
                 startContinuousScan();
                 
             } catch (err) {
-                console.error("Ошибка камеры:", err);
-                alert("Не удалось запустить камеру. Убедитесь, что сайт открыт по HTTPS.");
+                console.error("Ошибка ZXing:", err);
             }
         }
+
         async function applyZoom() {
             if (!videoTrack) return;
             try {
@@ -357,7 +443,10 @@
         }
 
         async function toggleTorch() {
-            if (!videoTrack) return;
+            if (!videoTrack) {
+                alert("Камера не активна");
+                return;
+            }
             try {
                 isTorchOn = !isTorchOn;
                 const capabilities = videoTrack.getCapabilities();
@@ -373,27 +462,24 @@
                 }
             } catch (err) {
                 isTorchOn = !isTorchOn;
-                alert("Ошибка вспышки");
+                alert("Ошибка вспышки: " + err.message);
             }
         }
 
         function startContinuousScan() {
-            // ZXing сам управляет сканированием через decodeContinue
             function scan() {
-                if (!isScanning && video.readyState === video.HAVE_ENOUGH_DATA) {
+                if (!isScanning && video.readyState === video.HAVE_ENOUGH_DATA && codeReader) {
                     isScanning = true;
                     
-                    // Создаем canvas для обработки кадра
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     canvas.width = 640;
                     canvas.height = 640;
                     
-                    // Рисуем кадр с видео
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);                    
-                    // Пробуем декодировать
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
                     codeReader.decodeFromCanvas(canvas, (result, err) => {
-                        if (result) {
+                        if (result && result.text) {
                             handleScanResult(result.text);
                         }
                         isScanning = false;
@@ -440,6 +526,7 @@
             } else {
                 container.classList.add('border-error');
             }
+
             setTimeout(() => {
                 container.classList.remove('border-success', 'border-error');
                 statusMsg.style.opacity = '0';
@@ -488,7 +575,8 @@
 
         function exportToExcel() {
             if (scannedCodes.size === 0) {
-                alert("Список пуст!");                return;
+                alert("Список пуст!");
+                return;
             }
 
             const data = Array.from(scannedCodes).map(code => [code]);
